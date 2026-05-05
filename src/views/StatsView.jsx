@@ -87,9 +87,12 @@ export default function StatsView({ attendance, assignments, onSelectRecipient }
           const seed = (idx * 13 + cg.id.charCodeAt(1)) % 5
           const count = 5 + seed
           const recs = RECIPIENTS.filter(r => r.primaryCaregiver === cg.id).slice(0, count)
-          while (recs.length < count) {
-            const filler = RECIPIENTS[(idx + recs.length) % RECIPIENTS.length]
-            if (!recs.includes(filler)) recs.push(filler)
+          if (recs.length < count) {
+            const extras = RECIPIENTS.filter(r => r.primaryCaregiver !== cg.id)
+            for (const r of extras) {
+              if (recs.length >= count) break
+              recs.push(r)
+            }
           }
           m[cg.id][day.label] = { count, recipients: recs.slice(0, count) }
         }
