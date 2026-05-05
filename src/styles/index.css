@@ -1,0 +1,14 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+}
+
+.scrollbar-thin::-webkit-scrollbar { height: 8px; width: 8px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: #F0E8D8; border-radius: 4px; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: #C4A87A; border-radius: 4px; }
+.scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #A08858; }
