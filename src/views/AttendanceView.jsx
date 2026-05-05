@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react'
 import { Search } from 'lucide-react'
-import { CAREGIVERS } from '../data/caregivers.js'
-import { RECIPIENTS } from '../data/recipients.js'
+import { useData } from '../context/DataContext.jsx'
 import { STATUS_TYPES } from '../data/statusTypes.js'
 import FilterChip from '../components/FilterChip.jsx'
 import { todayStr, weekDay } from '../utils/date.js'
 
 export default function AttendanceView({ attendance, setAttendance, onSelectRecipient }) {
+  const { recipients: RECIPIENTS, caregivers: CAREGIVERS } = useData()
   const [filterStatus, setFilterStatus] = useState('all')
   const [search, setSearch] = useState('')
 

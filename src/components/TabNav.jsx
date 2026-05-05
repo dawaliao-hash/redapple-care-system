@@ -1,4 +1,4 @@
-import { Users, ClipboardList, Activity, Heart, CalendarDays } from 'lucide-react'
+import { Users, ClipboardList, Activity, Heart, CalendarDays, Settings } from 'lucide-react'
 
 const TABS = [
   { id: 'matching',   label: '配對總覽', icon: Users },
@@ -6,6 +6,7 @@ const TABS = [
   { id: 'attendance', label: '今日點名', icon: Activity },
   { id: 'stats',      label: '服務統計', icon: ClipboardList },
   { id: 'health',     label: '健康紀錄', icon: Heart },
+  { id: 'admin',      label: '機構管理', icon: Settings },
 ]
 
 export default function TabNav({ tab, setTab }) {
@@ -17,17 +18,14 @@ export default function TabNav({ tab, setTab }) {
             const Icon   = t.icon
             const active = tab === t.id
             return (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
+              <button key={t.id} onClick={() => setTab(t.id)}
                 className="flex items-center gap-2 px-5 py-4 transition-all whitespace-nowrap font-display"
                 style={{
                   borderBottom: active ? '3px solid #A53838' : '3px solid transparent',
                   color:        active ? '#A53838' : '#8B6F47',
                   fontWeight:   active ? 600 : 400,
                   background:   active ? 'rgba(165,56,56,0.04)' : 'transparent',
-                }}
-              >
+                }}>
                 <Icon size={18} strokeWidth={active ? 2.5 : 1.8} />
                 <span className="text-base">{t.label}</span>
               </button>

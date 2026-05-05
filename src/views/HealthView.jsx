@@ -1,12 +1,13 @@
 import { useState, useMemo } from 'react'
 import { ChevronRight, Plus, AlertCircle, Activity, Heart, Droplets, Wind, FileText } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { RECIPIENTS } from '../data/recipients.js'
+import { useData } from '../context/DataContext.jsx'
 import VitalCard from '../components/VitalCard.jsx'
 import LegendDot from '../components/LegendDot.jsx'
 
 export default function HealthView({ healthRecords, onSelectRecipient }) {
-  const [pickedId, setPickedId] = useState(RECIPIENTS[0].id)
+  const { recipients: RECIPIENTS } = useData()
+  const [pickedId, setPickedId] = useState(RECIPIENTS[0]?.id ?? '')
   const recipient = RECIPIENTS.find(r => r.id === pickedId)
   const records = healthRecords[pickedId] || []
   const recent = [...records].slice(-7).reverse()

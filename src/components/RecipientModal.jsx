@@ -1,5 +1,5 @@
 import { X, Phone, MapPin, Users, Activity, FileText, Pill } from 'lucide-react'
-import { CAREGIVERS } from '../data/caregivers.js'
+import { useData } from '../context/DataContext.jsx'
 import { STATUS_TYPES } from '../data/statusTypes.js'
 
 function InfoRow({ icon, label, value }) {
@@ -24,7 +24,8 @@ function MiniVital({ label, value }) {
 }
 
 export default function RecipientModal({ recipient, healthRecords, attendance, onClose }) {
-  const cg = CAREGIVERS.find(c => c.id === recipient.primaryCaregiver)
+  const { caregivers } = useData()
+  const cg = caregivers.find(c => c.id === recipient.primaryCaregiver)
   const status = STATUS_TYPES[attendance]
   const last = healthRecords[healthRecords.length - 1]
 

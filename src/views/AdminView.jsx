@@ -1,0 +1,531 @@
+import { useState } from 'react'
+import { Plus, Pencil, Trash2, X, Check, Users, UserCheck, AlertTriangle } from 'lucide-react'
+import { useData } from '../context/DataContext.jsx'
+
+// ── 顏色選項（照服員） ────────────────────────────────
+const CG_COLORS = ['#B8543A','#7A9474','#C68B4F','#8E6BA8','#5B7B8C',
+                   '#4A7FA5','#A0522D','#6B8E6B','#B8860B','#8B4789']
+
+const BATH_OPTIONS = ['一','二','三','四','五']
+const LEVEL_OPTIONS = ['一般戶','中低戶','低收戶']
+const CMS_OPTIONS   = [1,2,3,4,5,6,7,8]
+
+// ── 共用 style ────────────────────────────────────────
+const inputCls = 'w-full px-3 py-2 rounded-lg border text-sm outline-none focus:border-cranberry'
+const inputSt  = { background: '#FBF6EC', borderColor: '#C4A87A', color: '#5C2828' }
+const labelSt  = { color: '#8B6F47', fontSize: 12, marginBottom: 4, display: 'block' }
+
+// ════════════════════════════════════════════════════════
+// 長者表單 Modal
+// ════════════════════════════════════════════════════════
+function RecipientModal({ initial, caregivers, onSave, onClose }) {
+  const isNew = !initial?.id
+  const [form, setForm] = useState(initial ?? {
+    id: `r${Date.now()}`, code: '', name: '', gender: '女', age: '',
+    cms: 5, primaryCaregiver: caregivers[0]?.id ?? '',
+    conditions: [], emergencyContact: '', phone: '', address: '',
+    bathDays: [], notes: '', level: '一般戶',
+  })
+  const [condInput, setCondInput] = useState((initial?.conditions ?? []).join('、'))
+  const [err, setErr] = useState('')
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const toggleBath = (day) => set('bathDays',
+    form.bathDays.includes(day)
+      ? form.bathDays.filter(d => d !== day)
+      : [...form.bathDays, day]
+  )
+
+  const handleSave = () => {
+    if (!form.name.trim()) { setErr('請填寫姓名'); return }
+    if (!form.code.trim()) { setErr('請填寫個案編號'); return }
+    onSave({ ...form, conditions: condInput.split(/[、,，\s]+/).filter(Boolean), age: Number(form.age) })
+  }
+
+  return (
+    <Overlay onClose={onClose}>
+      <ModalBox title={isNew ? '新增長者' : `編輯：${initial.name}`} onClose={onClose}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="姓名 *">
+            <input className={inputCls} style={inputSt} value={form.name}
+              onChange={e => set('name', e.target.value)} placeholder="例：黃淑" />
+          </Field>
+          <Field label="個案編號 *">
+            <input className={inputCls} style={inputSt} value={form.code}
+              onChange={e => set('code', e.target.value)} placeholder="例：108I01011" />
+          </Field>
+          <Field label="性別">
+            <div className="flex gap-2">
+              {['女','男'].map(g => (
+                <button key={g} onClick={() => set('gender', g)}
+                  className="flex-1 py-2 rounded-lg text-sm font-medium border transition"
+                  style={{ background: form.gender === g ? '#A53838' : '#FBF6EC',
+                           color: form.gender === g ? 'white' : '#5C3A1E',
+                           borderColor: '#C4A87A' }}>
+                  {g}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="年齡">
+            <input type="number" className={inputCls} style={inputSt} value={form.age}
+              onChange={e => set('age', e.target.value)} placeholder="例：82" min={0} max={120} />
+          </Field>
+          <Field label="CMS 等級">
+            <div className="flex gap-1 flex-wrap">
+              {CMS_OPTIONS.map(n => (
+                <button key={n} onClick={() => set('cms', n)}
+                  className="w-9 h-9 rounded-lg text-sm font-bold border transition"
+                  style={{ background: form.cms === n ? '#A53838' : '#FBF6EC',
+                           color: form.cms === n ? 'white' : '#5C3A1E',
+                           borderColor: '#C4A87A' }}>
+                  {n}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="身分別">
+            <div className="flex gap-2 flex-wrap">
+              {LEVEL_OPTIONS.map(l => (
+                <button key={l} onClick={() => set('level', l)}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium border transition"
+                  style={{ background: form.level === l ? '#C68B4F' : '#FBF6EC',
+                           color: form.level === l ? 'white' : '#5C3A1E',
+                           borderColor: '#C4A87A' }}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="主責照服員">
+            <select className={inputCls} style={inputSt} value={form.primaryCaregiver}
+              onChange={e => set('primaryCaregiver', e.target.value)}>
+              {caregivers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </Field>
+          <Field label="洗澡日">
+            <div className="flex gap-1">
+              {BATH_OPTIONS.map(d => (
+                <button key={d} onClick={() => toggleBath(d)}
+                  className="w-9 h-9 rounded-lg text-sm font-medium border transition"
+                  style={{ background: form.bathDays.includes(d) ? '#7A9474' : '#FBF6EC',
+                           color: form.bathDays.includes(d) ? 'white' : '#5C3A1E',
+                           borderColor: '#C4A87A' }}>
+                  {d}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="健康狀況（逗號分隔）" cls="sm:col-span-2">
+            <input className={inputCls} style={inputSt} value={condInput}
+              onChange={e => setCondInput(e.target.value)} placeholder="例：高血壓、糖尿病" />
+          </Field>
+          <Field label="緊急聯絡人">
+            <input className={inputCls} style={inputSt} value={form.emergencyContact}
+              onChange={e => set('emergencyContact', e.target.value)} placeholder="例：黃大哥" />
+          </Field>
+          <Field label="聯絡電話">
+            <input className={inputCls} style={inputSt} value={form.phone}
+              onChange={e => set('phone', e.target.value)} placeholder="例：0912-345-678" />
+          </Field>
+          <Field label="住址" cls="sm:col-span-2">
+            <input className={inputCls} style={inputSt} value={form.address}
+              onChange={e => set('address', e.target.value)} placeholder="例：雲林縣水林鄉信義路 12 號" />
+          </Field>
+          <Field label="備註" cls="sm:col-span-2">
+            <textarea rows={2} className={inputCls} style={inputSt} value={form.notes}
+              onChange={e => set('notes', e.target.value)} placeholder="特殊注意事項" />
+          </Field>
+        </div>
+        {err && (
+          <div className="mt-3 flex items-center gap-2 text-sm px-3 py-2 rounded-lg"
+            style={{ background: '#FBE8DC', color: '#A53838' }}>
+            <AlertTriangle size={14} />{err}
+          </div>
+        )}
+        <div className="flex justify-end gap-3 mt-5">
+          <button onClick={onClose}
+            className="px-4 py-2 rounded-lg text-sm border transition hover:bg-orange-50"
+            style={{ borderColor: '#C4A87A', color: '#5C3A1E' }}>取消</button>
+          <button onClick={handleSave}
+            className="px-5 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
+            style={{ background: '#A53838', color: 'white' }}>
+            <Check size={15} />{isNew ? '新增' : '儲存'}
+          </button>
+        </div>
+      </ModalBox>
+    </Overlay>
+  )
+}
+
+// ════════════════════════════════════════════════════════
+// 照服員表單 Modal
+// ════════════════════════════════════════════════════════
+function CaregiverModal({ initial, onSave, onClose }) {
+  const isNew = !initial?.id
+  const [form, setForm] = useState(initial ?? {
+    id: `c${Date.now()}`, name: '', avatar: '', color: CG_COLORS[0],
+  })
+  const [err, setErr] = useState('')
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const handleSave = () => {
+    if (!form.name.trim()) { setErr('請填寫姓名'); return }
+    onSave({ ...form, avatar: form.name[0] ?? '?' })
+  }
+
+  return (
+    <Overlay onClose={onClose}>
+      <ModalBox title={isNew ? '新增照服員' : `編輯：${initial.name}`} onClose={onClose} maxW={420}>
+        <div className="space-y-4">
+          <Field label="姓名 *">
+            <input className={inputCls} style={inputSt} value={form.name}
+              onChange={e => set('name', e.target.value)} placeholder="例：魏寶玫" />
+          </Field>
+          <Field label="代表顏色">
+            <div className="flex gap-2 flex-wrap">
+              {CG_COLORS.map(c => (
+                <button key={c} onClick={() => set('color', c)}
+                  className="w-8 h-8 rounded-full border-4 transition"
+                  style={{ background: c, borderColor: form.color === c ? '#5C2828' : 'transparent' }} />
+              ))}
+            </div>
+          </Field>
+          {/* 預覽 */}
+          <div className="flex items-center gap-3 p-3 rounded-xl border"
+            style={{ background: '#FBF6EC', borderColor: '#E5D5B7' }}>
+            <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xl"
+              style={{ background: form.color }}>{form.name[0] ?? '？'}</div>
+            <div>
+              <div className="font-display font-semibold" style={{ color: '#5C2828' }}>{form.name || '姓名預覽'}</div>
+              <div className="text-xs" style={{ color: '#8B6F47' }}>照服員</div>
+            </div>
+          </div>
+        </div>
+        {err && (
+          <div className="mt-3 flex items-center gap-2 text-sm px-3 py-2 rounded-lg"
+            style={{ background: '#FBE8DC', color: '#A53838' }}>
+            <AlertTriangle size={14} />{err}
+          </div>
+        )}
+        <div className="flex justify-end gap-3 mt-5">
+          <button onClick={onClose}
+            className="px-4 py-2 rounded-lg text-sm border transition hover:bg-orange-50"
+            style={{ borderColor: '#C4A87A', color: '#5C3A1E' }}>取消</button>
+          <button onClick={handleSave}
+            className="px-5 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
+            style={{ background: '#A53838', color: 'white' }}>
+            <Check size={15} />{isNew ? '新增' : '儲存'}
+          </button>
+        </div>
+      </ModalBox>
+    </Overlay>
+  )
+}
+
+// ════════════════════════════════════════════════════════
+// 刪除確認 Modal
+// ════════════════════════════════════════════════════════
+function DeleteConfirm({ name, onConfirm, onClose }) {
+  return (
+    <Overlay onClose={onClose}>
+      <ModalBox title="確認刪除" onClose={onClose} maxW={360}>
+        <div className="flex items-start gap-3 mb-5">
+          <AlertTriangle size={24} className="flex-shrink-0 mt-0.5" style={{ color: '#A53838' }} />
+          <p className="text-sm" style={{ color: '#5C2828' }}>
+            確定要刪除「<strong>{name}</strong>」嗎？此操作無法復原。
+          </p>
+        </div>
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose}
+            className="px-4 py-2 rounded-lg text-sm border"
+            style={{ borderColor: '#C4A87A', color: '#5C3A1E' }}>取消</button>
+          <button onClick={onConfirm}
+            className="px-5 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
+            style={{ background: '#A53838', color: 'white' }}>
+            <Trash2 size={14} /> 確認刪除
+          </button>
+        </div>
+      </ModalBox>
+    </Overlay>
+  )
+}
+
+// ════════════════════════════════════════════════════════
+// 主 AdminView
+// ════════════════════════════════════════════════════════
+export default function AdminView() {
+  const { recipients, addRecipient, updateRecipient, deleteRecipient,
+          caregivers, addCaregiver, updateCaregiver, deleteCaregiver } = useData()
+
+  const [subTab, setSubTab]           = useState('recipients')
+  const [editRecipient, setEditRecipient] = useState(null)  // null=關閉, {}=新增, {...}=編輯
+  const [deleteR, setDeleteR]             = useState(null)
+  const [editCaregiver, setEditCaregiver] = useState(null)
+  const [deleteCG, setDeleteCG]           = useState(null)
+  const [search, setSearch]               = useState('')
+
+  const filteredR = recipients.filter(r =>
+    r.name.includes(search) || r.code.includes(search) || (r.conditions?.join('') ?? '').includes(search)
+  )
+  const filteredCG = caregivers.filter(c => c.name.includes(search))
+
+  return (
+    <div className="space-y-5">
+      {/* 頁頭 */}
+      <div className="rounded-2xl p-5 border" style={{ background: '#FFFAF0', borderColor: '#E5D5B7' }}>
+        <h2 className="font-display text-xl font-semibold" style={{ color: '#5C2828' }}>機構資料管理</h2>
+        <p className="text-sm mt-1" style={{ color: '#8B6F47' }}>新增、修改、刪除長者與照服員資料</p>
+      </div>
+
+      {/* 子頁籤 + 搜尋 */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex rounded-xl overflow-hidden border" style={{ borderColor: '#C4A87A' }}>
+          {[
+            { id: 'recipients', label: '被照顧長者', icon: Users,     count: recipients.length },
+            { id: 'caregivers', label: '照服員',     icon: UserCheck, count: caregivers.length },
+          ].map(t => {
+            const Icon   = t.icon
+            const active = subTab === t.id
+            return (
+              <button key={t.id} onClick={() => { setSubTab(t.id); setSearch('') }}
+                className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition"
+                style={{ background: active ? '#A53838' : '#FBF6EC', color: active ? 'white' : '#5C3A1E' }}>
+                <Icon size={16} />
+                {t.label}
+                <span className="px-1.5 py-0.5 rounded-full text-xs"
+                  style={{ background: active ? 'rgba(255,255,255,0.25)' : '#EAE0CC',
+                           color: active ? 'white' : '#8B6F47' }}>{t.count}</span>
+              </button>
+            )
+          })}
+        </div>
+        <input
+          value={search} onChange={e => setSearch(e.target.value)}
+          placeholder={subTab === 'recipients' ? '搜尋姓名 / 編號 / 疾病' : '搜尋姓名'}
+          className="flex-1 min-w-[160px] px-3 py-2 rounded-lg border text-sm outline-none"
+          style={{ background: '#FBF6EC', borderColor: '#C4A87A', color: '#5C2828' }}
+        />
+        <button
+          onClick={() => subTab === 'recipients' ? setEditRecipient({}) : setEditCaregiver({})}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium"
+          style={{ background: '#A53838', color: 'white' }}>
+          <Plus size={16} />
+          {subTab === 'recipients' ? '新增長者' : '新增照服員'}
+        </button>
+      </div>
+
+      {/* ── 長者列表 ── */}
+      {subTab === 'recipients' && (
+        <div className="rounded-2xl border overflow-hidden" style={{ borderColor: '#E5D5B7' }}>
+          <div className="overflow-x-auto scrollbar-thin">
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ background: '#FBF1DD' }}>
+                  {['序','姓名','個案編號','性別','年齡','CMS','主責照服員','健康狀況','洗澡日','操作'].map(h => (
+                    <th key={h} className="px-3 py-3 text-left font-display font-semibold"
+                      style={{ color: '#5C2828', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredR.map((r, i) => {
+                  const cg = caregivers.find(c => c.id === r.primaryCaregiver)
+                  return (
+                    <tr key={r.id} className="border-t hover:bg-orange-50 transition"
+                      style={{ borderColor: '#EAE0CC' }}>
+                      <td className="px-3 py-2.5 font-mono text-xs" style={{ color: '#A09684' }}>{i + 1}</td>
+                      <td className="px-3 py-2.5 font-display font-semibold" style={{ color: '#5C2828' }}>{r.name}</td>
+                      <td className="px-3 py-2.5 font-mono text-xs" style={{ color: '#8B6F47' }}>{r.code}</td>
+                      <td className="px-3 py-2.5 text-center">{r.gender}</td>
+                      <td className="px-3 py-2.5 text-center">{r.age}</td>
+                      <td className="px-3 py-2.5 text-center">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold"
+                          style={{ background: '#EAE0CC', color: '#5C3A1E' }}>{r.cms}</span>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center gap-1.5">
+                          {cg && <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                            style={{ background: cg.color }}>{cg.avatar}</div>}
+                          <span style={{ color: '#5C3A1E' }}>{cg?.name ?? '—'}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex flex-wrap gap-1">
+                          {(r.conditions ?? []).map(c => (
+                            <span key={c} className="text-xs px-1.5 py-0.5 rounded"
+                              style={{ background: '#F5E6D3', color: '#A0541E' }}>{c}</span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5 text-xs" style={{ color: '#8B6F47' }}>
+                        {(r.bathDays ?? []).join('、')}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex gap-1">
+                          <button onClick={() => setEditRecipient(r)}
+                            className="p-1.5 rounded-lg hover:bg-orange-100 transition"
+                            title="編輯" style={{ color: '#A53838' }}>
+                            <Pencil size={14} />
+                          </button>
+                          <button onClick={() => setDeleteR(r)}
+                            className="p-1.5 rounded-lg hover:bg-red-50 transition"
+                            title="刪除" style={{ color: '#A53838' }}>
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {filteredR.length === 0 && (
+                  <tr><td colSpan={10} className="py-10 text-center text-sm" style={{ color: '#A09684' }}>
+                    沒有符合條件的長者
+                  </td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-4 py-3 text-xs text-right" style={{ color: '#A09684', borderTop: '1px solid #EAE0CC' }}>
+            共 {recipients.length} 位長者，顯示 {filteredR.length} 位
+          </div>
+        </div>
+      )}
+
+      {/* ── 照服員列表 ── */}
+      {subTab === 'caregivers' && (
+        <div className="rounded-2xl border overflow-hidden" style={{ borderColor: '#E5D5B7' }}>
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ background: '#FBF1DD' }}>
+                {['序','照服員','目前分配長者數','操作'].map(h => (
+                  <th key={h} className="px-4 py-3 text-left font-display font-semibold"
+                    style={{ color: '#5C2828' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCG.map((cg, i) => {
+                const load = recipients.filter(r => r.primaryCaregiver === cg.id).length
+                return (
+                  <tr key={cg.id} className="border-t hover:bg-orange-50 transition"
+                    style={{ borderColor: '#EAE0CC' }}>
+                    <td className="px-4 py-3 font-mono text-xs" style={{ color: '#A09684' }}>{i + 1}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-base"
+                          style={{ background: cg.color }}>{cg.avatar}</div>
+                        <div>
+                          <div className="font-display font-semibold" style={{ color: '#5C2828' }}>{cg.name}</div>
+                          <div className="text-xs font-mono" style={{ color: '#A09684' }}>{cg.id}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-24 h-2 rounded-full overflow-hidden" style={{ background: '#EAE0CC' }}>
+                          <div className="h-full rounded-full"
+                            style={{ width: `${Math.min(load / 8 * 100, 100)}%`,
+                                     background: load > 8 ? '#A53838' : '#7A9474' }} />
+                        </div>
+                        <span className="font-medium" style={{ color: load > 8 ? '#A53838' : '#5C2828' }}>
+                          {load} / 8
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1">
+                        <button onClick={() => setEditCaregiver(cg)}
+                          className="p-1.5 rounded-lg hover:bg-orange-100 transition"
+                          title="編輯" style={{ color: '#A53838' }}>
+                          <Pencil size={14} />
+                        </button>
+                        <button onClick={() => setDeleteCG(cg)}
+                          className="p-1.5 rounded-lg hover:bg-red-50 transition"
+                          title="刪除" style={{ color: '#A53838' }}>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+              {filteredCG.length === 0 && (
+                <tr><td colSpan={4} className="py-10 text-center text-sm" style={{ color: '#A09684' }}>
+                  沒有符合條件的照服員
+                </td></tr>
+              )}
+            </tbody>
+          </table>
+          <div className="px-4 py-3 text-xs text-right" style={{ color: '#A09684', borderTop: '1px solid #EAE0CC' }}>
+            共 {caregivers.length} 位照服員
+          </div>
+        </div>
+      )}
+
+      {/* ── Modals ── */}
+      {editRecipient !== null && (
+        <RecipientModal
+          initial={editRecipient.id ? editRecipient : null}
+          caregivers={caregivers}
+          onSave={r => { editRecipient.id ? updateRecipient(r) : addRecipient(r); setEditRecipient(null) }}
+          onClose={() => setEditRecipient(null)}
+        />
+      )}
+      {deleteR && (
+        <DeleteConfirm name={deleteR.name}
+          onConfirm={() => { deleteRecipient(deleteR.id); setDeleteR(null) }}
+          onClose={() => setDeleteR(null)} />
+      )}
+      {editCaregiver !== null && (
+        <CaregiverModal
+          initial={editCaregiver.id ? editCaregiver : null}
+          onSave={c => { editCaregiver.id ? updateCaregiver(c) : addCaregiver(c); setEditCaregiver(null) }}
+          onClose={() => setEditCaregiver(null)}
+        />
+      )}
+      {deleteCG && (
+        <DeleteConfirm name={deleteCG.name}
+          onConfirm={() => { deleteCaregiver(deleteCG.id); setDeleteCG(null) }}
+          onClose={() => setDeleteCG(null)} />
+      )}
+    </div>
+  )
+}
+
+// ── 共用 UI 元件 ─────────────────────────────────────────
+function Overlay({ children, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(60,30,15,0.6)' }}
+      onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}>{children}</div>
+    </div>
+  )
+}
+
+function ModalBox({ title, children, onClose, maxW = 680 }) {
+  return (
+    <div className="rounded-2xl border-2 overflow-hidden"
+      style={{ background: '#FFFAF0', borderColor: '#C4A87A', width: '100%', maxWidth: maxW, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div className="flex items-center justify-between px-6 py-4 border-b"
+        style={{ background: '#FBF1DD', borderColor: '#E5D5B7' }}>
+        <h3 className="font-display text-lg font-semibold" style={{ color: '#5C2828' }}>{title}</h3>
+        <button onClick={onClose} className="p-1.5 rounded-full hover:bg-orange-100 transition">
+          <X size={20} style={{ color: '#5C2828' }} />
+        </button>
+      </div>
+      <div className="p-6">{children}</div>
+    </div>
+  )
+}
+
+function Field({ label, children, cls = '' }) {
+  return (
+    <div className={cls}>
+      <label style={labelSt}>{label}</label>
+      {children}
+    </div>
+  )
+}

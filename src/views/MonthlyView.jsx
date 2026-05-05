@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
-import { ChevronLeft, ChevronRight, Printer } from 'lucide-react'
-import { RECIPIENTS } from '../data/recipients.js'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useData } from '../context/DataContext.jsx'
 import { STATUS_TYPES } from '../data/statusTypes.js'
 import { TW_HOLIDAYS, formatDisplayDate } from '../data/monthlyAttendance.js'
 
@@ -31,6 +31,7 @@ function getDaysInMonth(year, month) {
 }
 
 export default function MonthlyView({ monthlyAttendance, setMonthlyAttendance }) {
+  const { recipients: RECIPIENTS } = useData()
   const today = new Date()
   const [viewYear, setViewYear]   = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth() + 1)

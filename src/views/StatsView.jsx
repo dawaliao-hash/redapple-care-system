@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react'
 import { X, ChevronRight } from 'lucide-react'
-import { CAREGIVERS } from '../data/caregivers.js'
-import { RECIPIENTS } from '../data/recipients.js'
+import { useData } from '../context/DataContext.jsx'
 
 function CaregiverDayModal({ data, onClose, onSelectRecipient }) {
   return (
@@ -54,6 +53,7 @@ function CaregiverDayModal({ data, onClose, onSelectRecipient }) {
 }
 
 export default function StatsView({ attendance, assignments, onSelectRecipient }) {
+  const { recipients: RECIPIENTS, caregivers: CAREGIVERS } = useData()
   const [selectedCg, setSelectedCg] = useState(null)
 
   const days = useMemo(() => {
