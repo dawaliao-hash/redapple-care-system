@@ -1,9 +1,10 @@
-import { Users, ClipboardList, Activity, Heart } from 'lucide-react'
+import { Users, ClipboardList, Activity, Heart, CalendarDays } from 'lucide-react'
 
 const TABS = [
   { id: 'matching',   label: '配對總覽', icon: Users },
+  { id: 'monthly',    label: '月度點名', icon: CalendarDays },
+  { id: 'attendance', label: '今日點名', icon: Activity },
   { id: 'stats',      label: '服務統計', icon: ClipboardList },
-  { id: 'attendance', label: '出缺席表', icon: Activity },
   { id: 'health',     label: '健康紀錄', icon: Heart },
 ]
 
@@ -13,7 +14,7 @@ export default function TabNav({ tab, setTab }) {
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex gap-1 overflow-x-auto scrollbar-thin">
           {TABS.map(t => {
-            const Icon = t.icon
+            const Icon   = t.icon
             const active = tab === t.id
             return (
               <button
@@ -22,9 +23,9 @@ export default function TabNav({ tab, setTab }) {
                 className="flex items-center gap-2 px-5 py-4 transition-all whitespace-nowrap font-display"
                 style={{
                   borderBottom: active ? '3px solid #A53838' : '3px solid transparent',
-                  color: active ? '#A53838' : '#8B6F47',
-                  fontWeight: active ? 600 : 400,
-                  background: active ? 'rgba(165,56,56,0.04)' : 'transparent',
+                  color:        active ? '#A53838' : '#8B6F47',
+                  fontWeight:   active ? 600 : 400,
+                  background:   active ? 'rgba(165,56,56,0.04)' : 'transparent',
                 }}
               >
                 <Icon size={18} strokeWidth={active ? 2.5 : 1.8} />
