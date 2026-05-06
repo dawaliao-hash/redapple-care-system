@@ -34,7 +34,7 @@ function AppInner() {
     return m
   })
 
-  const [healthRecords]      = useState(INITIAL_HEALTH)
+  const [healthRecords, setHealthRecords] = useState(INITIAL_HEALTH)
   const [selectedRecipient, setSelectedRecipient] = useState(null)
 
   return (
@@ -46,7 +46,7 @@ function AppInner() {
         {tab === 'monthly'    && <MonthlyView     monthlyAttendance={monthlyAttendance} setMonthlyAttendance={setMonthlyAttendance} />}
         {tab === 'attendance' && <AttendanceView  attendance={attendance} setAttendance={setAttendance} onSelectRecipient={setSelectedRecipient} />}
         {tab === 'stats'      && <StatsView       attendance={attendance} assignments={assignments} onSelectRecipient={setSelectedRecipient} />}
-        {tab === 'health'     && <HealthView      healthRecords={healthRecords} onSelectRecipient={setSelectedRecipient} />}
+        {tab === 'health'     && <HealthView      healthRecords={healthRecords} setHealthRecords={setHealthRecords} onSelectRecipient={setSelectedRecipient} />}
         {tab === 'admin'      && <AdminView />}
       </main>
       {selectedRecipient && (
