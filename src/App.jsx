@@ -16,11 +16,20 @@ import AdminView from './views/AdminView.jsx'
 const INITIAL_HEALTH = generateHealthRecords()
 const todayStr       = formatDisplayDate(new Date())
 
+// 每位長者的預設主責照服員
+const defaultAssignments = () => {
+  const m = {}
+  RECIPIENTS.forEach(r => { m[r.id] = r.primaryCaregiver })
+  return m
+}
+
 function AppInner() {
   const [tab, setTab] = useState('matching')
 
+  // 月度出缺席（單一資料源）
   const [monthlyAttendance, setMonthlyAttendance] = useState(generateMonthlyAttendance)
 
+  // 今日出缺席（從月度衍生）
   const attendance    = monthlyAttendance[todayStr] ?? {}
   const setAttendance = (updater) =>
     setMonthlyAttendance(prev => ({
@@ -28,11 +37,8 @@ function AppInner() {
       [todayStr]: typeof updater === 'function' ? updater(prev[todayStr] ?? {}) : updater,
     }))
 
-  const [assignments, setAssignments] = useState(() => {
-    const m = {}
-    RECIPIENTS.forEach(r => { m[r.id] = r.primaryCaregiver })
-    return m
-  })
+  // 每天各自的照服員配對 { 'YYYY/MM/DD': { recipientId: caregiverId } }
+  const [dailyAssignments, setDailyAssignments] = useState({ [todayStr]: defaultAssignments() })
 
   const [healthRecords, setHealthRecords] = useState(INITIAL_HEALTH)
   const [selectedRecipient, setSelectedRecipient] = useState(null)
@@ -42,10 +48,19 @@ function AppInner() {
       <Header />
       <TabNav tab={tab} setTab={setTab} />
       <main className="max-w-7xl mx-auto px-6 py-6">
-        {tab === 'matching'   && <MatchingView    attendance={attendance} assignments={assignments} setAssignments={setAssignments} onSelectRecipient={setSelectedRecipient} />}
+        {tab === 'matching'   && (
+          <MatchingView
+            monthlyAttendance={monthlyAttendance}
+            setMonthlyAttendance={setMonthlyAttendance}
+            dailyAssignments={dailyAssignments}
+            setDailyAssignments={setDailyAssignments}
+            defaultAssignments={defaultAssignments}
+            onSelectRecipient={setSelectedRecipient}
+          />
+        )}
         {tab === 'monthly'    && <MonthlyView     monthlyAttendance={monthlyAttendance} setMonthlyAttendance={setMonthlyAttendance} />}
         {tab === 'attendance' && <AttendanceView  attendance={attendance} setAttendance={setAttendance} onSelectRecipient={setSelectedRecipient} />}
-        {tab === 'stats'      && <StatsView       attendance={attendance} assignments={assignments} onSelectRecipient={setSelectedRecipient} />}
+        {tab === 'stats'      && <StatsView       attendance={attendance} assignments={dailyAssignments[todayStr] ?? defaultAssignments()} onSelectRecipient={setSelectedRecipient} />}
         {tab === 'health'     && <HealthView      healthRecords={healthRecords} setHealthRecords={setHealthRecords} onSelectRecipient={setSelectedRecipient} />}
         {tab === 'admin'      && <AdminView />}
       </main>
