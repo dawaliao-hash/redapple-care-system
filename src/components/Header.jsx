@@ -30,7 +30,7 @@ export default function Header() {
           <div className="h-10 w-px" style={{ background: '#C4A87A' }}></div>
           <div className="flex flex-col items-end">
             <span className="text-xs" style={{ color: '#8B6F47' }}>承辦</span>
-            <span className="font-medium" style={{ color: '#5C2828' }}>吳國良 社工師</span>
+            <span className="font-medium" style={{ color: '#5C2828' }}>陳慈敏 社工師</span>
           </div>
         </div>
       </div>
