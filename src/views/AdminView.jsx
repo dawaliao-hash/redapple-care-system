@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { Plus, Pencil, Trash2, X, Check, Users, UserCheck, AlertTriangle } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Check, Users, UserCheck, AlertTriangle, RotateCcw } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
+import { RECIPIENTS as DEFAULT_RECIPIENTS } from '../data/recipients.js'
+import { CAREGIVERS as DEFAULT_CAREGIVERS } from '../data/caregivers.js'
 
 // ── 顏色選項（照服員） ────────────────────────────────
 const CG_COLORS = ['#B8543A','#7A9474','#C68B4F','#8E6BA8','#5B7B8C',
@@ -257,13 +259,25 @@ function DeleteConfirm({ name, onConfirm, onClose }) {
 // ════════════════════════════════════════════════════════
 export default function AdminView() {
   const { recipients, addRecipient, updateRecipient, deleteRecipient,
-          caregivers, addCaregiver, updateCaregiver, deleteCaregiver } = useData()
+          caregivers, addCaregiver, updateCaregiver, deleteCaregiver,
+          setRecipients, setCaregivers } = useData()
 
-  const [subTab, setSubTab]           = useState('recipients')
-  const [editRecipient, setEditRecipient] = useState(null)  // null=關閉, {}=新增, {...}=編輯
+  const [subTab, setSubTab]               = useState('recipients')
+  const [editRecipient, setEditRecipient] = useState(null)
   const [deleteR, setDeleteR]             = useState(null)
   const [editCaregiver, setEditCaregiver] = useState(null)
   const [deleteCG, setDeleteCG]           = useState(null)
+  const [confirmReset, setConfirmReset]   = useState(false)
+
+  const handleReset = () => {
+    // 清除 localStorage 並恢復預設資料
+    localStorage.removeItem('redapple_recipients')
+    localStorage.removeItem('redapple_caregivers')
+    localStorage.removeItem('redapple_monthly_attendance')
+    localStorage.removeItem('redapple_daily_assignments')
+    localStorage.removeItem('redapple_health_records')
+    window.location.reload()
+  }
   const [search, setSearch]               = useState('')
 
   const filteredR = recipients.filter(r =>
@@ -274,10 +288,47 @@ export default function AdminView() {
   return (
     <div className="space-y-5">
       {/* 頁頭 */}
-      <div className="rounded-2xl p-5 border" style={{ background: '#FFFAF0', borderColor: '#E5D5B7' }}>
-        <h2 className="font-display text-xl font-semibold" style={{ color: '#5C2828' }}>機構資料管理</h2>
-        <p className="text-sm mt-1" style={{ color: '#8B6F47' }}>新增、修改、刪除長者與照服員資料</p>
+      <div className="rounded-2xl p-5 border flex flex-wrap items-start justify-between gap-4"
+        style={{ background: '#FFFAF0', borderColor: '#E5D5B7' }}>
+        <div>
+          <h2 className="font-display text-xl font-semibold" style={{ color: '#5C2828' }}>機構資料管理</h2>
+          <p className="text-sm mt-1" style={{ color: '#8B6F47' }}>
+            新增、修改、刪除資料後自動儲存，重新整理頁面也不會遺失
+          </p>
+          <div className="flex items-center gap-1.5 mt-2">
+            <span className="w-2 h-2 rounded-full" style={{ background: '#7A9474' }}></span>
+            <span className="text-xs" style={{ color: '#7A9474' }}>資料已啟用本機儲存（localStorage）</span>
+          </div>
+        </div>
+        <button
+          onClick={() => setConfirmReset(true)}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm border transition hover:bg-red-50"
+          style={{ borderColor: '#E5D5B7', color: '#8B6F47' }}>
+          <RotateCcw size={14} /> 重設為預設資料
+        </button>
       </div>
+
+      {/* 重設確認 */}
+      {confirmReset && (
+        <div className="rounded-2xl p-4 border flex items-start gap-3"
+          style={{ background: '#FBE8DC', borderColor: '#A53838' }}>
+          <AlertTriangle size={18} className="flex-shrink-0 mt-0.5" style={{ color: '#A53838' }} />
+          <div className="flex-1">
+            <p className="text-sm font-semibold" style={{ color: '#5C2828' }}>確定要重設所有資料？</p>
+            <p className="text-xs mt-0.5" style={{ color: '#8B6F47' }}>
+              所有自訂的長者、照服員、出缺席、健康紀錄都將清除，恢復為系統預設資料。此操作無法復原。
+            </p>
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
+            <button onClick={() => setConfirmReset(false)}
+              className="px-3 py-1.5 rounded-lg text-sm border"
+              style={{ borderColor: '#C4A87A', color: '#5C3A1E' }}>取消</button>
+            <button onClick={handleReset}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium"
+              style={{ background: '#A53838', color: 'white' }}>確認重設</button>
+          </div>
+        </div>
+      )}
 
       {/* 子頁籤 + 搜尋 */}
       <div className="flex flex-wrap items-center gap-3">

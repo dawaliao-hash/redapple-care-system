@@ -1,8 +1,8 @@
-import { useState } from 'react'
-import { DataProvider } from './context/DataContext.jsx'
+import { useCallback } from 'react'
+import { DataProvider, useData } from './context/DataContext.jsx'
 import { generateHealthRecords } from './data/mockHealth.js'
 import { generateMonthlyAttendance, formatDisplayDate } from './data/monthlyAttendance.js'
-import { RECIPIENTS } from './data/recipients.js'
+import { useLocalStorage } from './utils/useLocalStorage.js'
 import Header from './components/Header.jsx'
 import TabNav from './components/TabNav.jsx'
 import RecipientModal from './components/RecipientModal.jsx'
@@ -12,35 +12,49 @@ import StatsView from './views/StatsView.jsx'
 import AttendanceView from './views/AttendanceView.jsx'
 import HealthView from './views/HealthView.jsx'
 import AdminView from './views/AdminView.jsx'
+import { useState } from 'react'
 
-const INITIAL_HEALTH = generateHealthRecords()
-const todayStr       = formatDisplayDate(new Date())
-
-// 每位長者的預設主責照服員
-const defaultAssignments = () => {
-  const m = {}
-  RECIPIENTS.forEach(r => { m[r.id] = r.primaryCaregiver })
-  return m
-}
+const todayStr = formatDisplayDate(new Date())
 
 function AppInner() {
+  const { recipients } = useData()
+
+  // 每位長者的預設主責照服員（從 context 動態衍生）
+  const defaultAssignments = useCallback(() => {
+    const m = {}
+    recipients.forEach(r => { m[r.id] = r.primaryCaregiver })
+    return m
+  }, [recipients])
+
   const [tab, setTab] = useState('matching')
 
-  // 月度出缺席（單一資料源）
-  const [monthlyAttendance, setMonthlyAttendance] = useState(generateMonthlyAttendance)
+  // ── 月度出缺席 (localStorage 持久化) ─────────────────
+  const [monthlyAttendance, setMonthlyAttendance] = useLocalStorage(
+    'redapple_monthly_attendance',
+    generateMonthlyAttendance
+  )
 
   // 今日出缺席（從月度衍生）
   const attendance    = monthlyAttendance[todayStr] ?? {}
-  const setAttendance = (updater) =>
+  const setAttendance = useCallback((updater) =>
     setMonthlyAttendance(prev => ({
       ...prev,
       [todayStr]: typeof updater === 'function' ? updater(prev[todayStr] ?? {}) : updater,
-    }))
+    })), [setMonthlyAttendance])
 
-  // 每天各自的照服員配對 { 'YYYY/MM/DD': { recipientId: caregiverId } }
-  const [dailyAssignments, setDailyAssignments] = useState({ [todayStr]: defaultAssignments() })
+  // ── 每日照服員配對 (localStorage 持久化) ─────────────
+  const [dailyAssignments, setDailyAssignments] = useLocalStorage(
+    'redapple_daily_assignments',
+    () => ({ [todayStr]: defaultAssignments() })
+  )
 
-  const [healthRecords, setHealthRecords] = useState(INITIAL_HEALTH)
+  // ── 健康紀錄 (localStorage 持久化) ───────────────────
+  const [healthRecords, setHealthRecords] = useLocalStorage(
+    'redapple_health_records',
+    generateHealthRecords
+  )
+
+  // ── 選中長者 Modal ────────────────────────────────────
   const [selectedRecipient, setSelectedRecipient] = useState(null)
 
   return (
@@ -48,7 +62,7 @@ function AppInner() {
       <Header />
       <TabNav tab={tab} setTab={setTab} />
       <main className="max-w-7xl mx-auto px-6 py-6">
-        {tab === 'matching'   && (
+        {tab === 'matching' && (
           <MatchingView
             monthlyAttendance={monthlyAttendance}
             setMonthlyAttendance={setMonthlyAttendance}
@@ -58,12 +72,36 @@ function AppInner() {
             onSelectRecipient={setSelectedRecipient}
           />
         )}
-        {tab === 'monthly'    && <MonthlyView     monthlyAttendance={monthlyAttendance} setMonthlyAttendance={setMonthlyAttendance} />}
-        {tab === 'attendance' && <AttendanceView  attendance={attendance} setAttendance={setAttendance} onSelectRecipient={setSelectedRecipient} />}
-        {tab === 'stats'      && <StatsView       attendance={attendance} assignments={dailyAssignments[todayStr] ?? defaultAssignments()} onSelectRecipient={setSelectedRecipient} />}
-        {tab === 'health'     && <HealthView      healthRecords={healthRecords} setHealthRecords={setHealthRecords} onSelectRecipient={setSelectedRecipient} />}
-        {tab === 'admin'      && <AdminView />}
+        {tab === 'monthly' && (
+          <MonthlyView
+            monthlyAttendance={monthlyAttendance}
+            setMonthlyAttendance={setMonthlyAttendance}
+          />
+        )}
+        {tab === 'attendance' && (
+          <AttendanceView
+            attendance={attendance}
+            setAttendance={setAttendance}
+            onSelectRecipient={setSelectedRecipient}
+          />
+        )}
+        {tab === 'stats' && (
+          <StatsView
+            attendance={attendance}
+            assignments={dailyAssignments[todayStr] ?? defaultAssignments()}
+            onSelectRecipient={setSelectedRecipient}
+          />
+        )}
+        {tab === 'health' && (
+          <HealthView
+            healthRecords={healthRecords}
+            setHealthRecords={setHealthRecords}
+            onSelectRecipient={setSelectedRecipient}
+          />
+        )}
+        {tab === 'admin' && <AdminView />}
       </main>
+
       {selectedRecipient && (
         <RecipientModal
           recipient={selectedRecipient}

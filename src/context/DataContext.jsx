@@ -1,12 +1,13 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext } from 'react'
 import { RECIPIENTS as INIT_RECIPIENTS } from '../data/recipients.js'
 import { CAREGIVERS as INIT_CAREGIVERS } from '../data/caregivers.js'
+import { useLocalStorage } from '../utils/useLocalStorage.js'
 
 const DataContext = createContext(null)
 
 export function DataProvider({ children }) {
-  const [recipients, setRecipients] = useState(INIT_RECIPIENTS)
-  const [caregivers, setCaregivers] = useState(INIT_CAREGIVERS)
+  const [recipients, setRecipients] = useLocalStorage('redapple_recipients', INIT_RECIPIENTS)
+  const [caregivers, setCaregivers] = useLocalStorage('redapple_caregivers', INIT_CAREGIVERS)
 
   const addRecipient    = (r)  => setRecipients(prev => [...prev, r])
   const updateRecipient = (r)  => setRecipients(prev => prev.map(x => x.id === r.id ? r : x))
@@ -18,8 +19,8 @@ export function DataProvider({ children }) {
 
   return (
     <DataContext.Provider value={{
-      recipients, addRecipient, updateRecipient, deleteRecipient,
-      caregivers, addCaregiver, updateCaregiver, deleteCaregiver,
+      recipients, setRecipients, addRecipient, updateRecipient, deleteRecipient,
+      caregivers, setCaregivers, addCaregiver, updateCaregiver, deleteCaregiver,
     }}>
       {children}
     </DataContext.Provider>
