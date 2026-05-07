@@ -1,8 +1,7 @@
 import { useState } from 'react'
-import { Plus, Pencil, Trash2, X, Check, Users, UserCheck, AlertTriangle, RotateCcw } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Check, Users, UserCheck, AlertTriangle, RotateCcw, Cloud, HardDrive } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
-import { RECIPIENTS as DEFAULT_RECIPIENTS } from '../data/recipients.js'
-import { CAREGIVERS as DEFAULT_CAREGIVERS } from '../data/caregivers.js'
+import { isOnline } from '../lib/supabase.js'
 
 // ── 顏色選項（照服員） ────────────────────────────────
 const CG_COLORS = ['#B8543A','#7A9474','#C68B4F','#8E6BA8','#5B7B8C',
@@ -296,8 +295,21 @@ export default function AdminView() {
             新增、修改、刪除資料後自動儲存，重新整理頁面也不會遺失
           </p>
           <div className="flex items-center gap-1.5 mt-2">
-            <span className="w-2 h-2 rounded-full" style={{ background: '#7A9474' }}></span>
-            <span className="text-xs" style={{ color: '#7A9474' }}>資料已啟用本機儲存（localStorage）</span>
+            {isOnline ? (
+              <>
+                <Cloud size={13} style={{ color: '#7A9474' }} />
+                <span className="text-xs font-medium" style={{ color: '#7A9474' }}>
+                  已連接 Supabase 雲端資料庫 — 所有裝置即時共用同一份資料
+                </span>
+              </>
+            ) : (
+              <>
+                <HardDrive size={13} style={{ color: '#C68B4F' }} />
+                <span className="text-xs font-medium" style={{ color: '#C68B4F' }}>
+                  離線模式 — 資料暫存於本機，連線後將自動同步
+                </span>
+              </>
+            )}
           </div>
         </div>
         <button
@@ -520,25 +532,37 @@ export default function AdminView() {
         <RecipientModal
           initial={editRecipient.id ? editRecipient : null}
           caregivers={caregivers}
-          onSave={r => { editRecipient.id ? updateRecipient(r) : addRecipient(r); setEditRecipient(null) }}
+          onSave={async (r) => {
+            await (editRecipient.id ? updateRecipient(r) : addRecipient(r))
+            setEditRecipient(null)
+          }}
           onClose={() => setEditRecipient(null)}
         />
       )}
       {deleteR && (
         <DeleteConfirm name={deleteR.name}
-          onConfirm={() => { deleteRecipient(deleteR.id); setDeleteR(null) }}
+          onConfirm={async () => {
+            await deleteRecipient(deleteR.id)
+            setDeleteR(null)
+          }}
           onClose={() => setDeleteR(null)} />
       )}
       {editCaregiver !== null && (
         <CaregiverModal
           initial={editCaregiver.id ? editCaregiver : null}
-          onSave={c => { editCaregiver.id ? updateCaregiver(c) : addCaregiver(c); setEditCaregiver(null) }}
+          onSave={async (c) => {
+            await (editCaregiver.id ? updateCaregiver(c) : addCaregiver(c))
+            setEditCaregiver(null)
+          }}
           onClose={() => setEditCaregiver(null)}
         />
       )}
       {deleteCG && (
         <DeleteConfirm name={deleteCG.name}
-          onConfirm={() => { deleteCaregiver(deleteCG.id); setDeleteCG(null) }}
+          onConfirm={async () => {
+            await deleteCaregiver(deleteCG.id)
+            setDeleteCG(null)
+          }}
           onClose={() => setDeleteCG(null)} />
       )}
     </div>
