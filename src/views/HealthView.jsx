@@ -249,7 +249,7 @@ function AddMeasurementModal({ recipientName, caregivers, onSave, onClose }) {
 }
 
 // ── 主 HealthView ─────────────────────────────────────────
-export default function HealthView({ healthRecords, setHealthRecords, onSelectRecipient }) {
+export default function HealthView({ healthRecords, setHealthRecords, addHealthRecord, onSelectRecipient }) {
   const { recipients: RECIPIENTS, caregivers: CAREGIVERS } = useData()
   const [pickedId, setPickedId]     = useState(RECIPIENTS[0]?.id ?? '')
   const [showModal, setShowModal]   = useState(false)
@@ -276,11 +276,15 @@ export default function HealthView({ healthRecords, setHealthRecords, onSelectRe
 
   const lastRecord = records[records.length - 1]
 
-  const handleAddRecord = (newRec) => {
-    setHealthRecords(prev => ({
-      ...prev,
-      [pickedId]: [...(prev[pickedId] || []), newRec],
-    }))
+  const handleAddRecord = async (newRec) => {
+    if (addHealthRecord) {
+      await addHealthRecord(pickedId, newRec)
+    } else {
+      setHealthRecords(prev => ({
+        ...prev,
+        [pickedId]: [...(prev[pickedId] || []), newRec],
+      }))
+    }
     setShowModal(false)
   }
 

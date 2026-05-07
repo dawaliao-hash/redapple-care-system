@@ -1,6 +1,6 @@
 import { todayStr, weekDay } from '../utils/date.js'
 
-export default function Header({ syncing, lastSync }) {
+export default function Header({ syncing, lastSync, isOnline }) {
   return (
     <header className="border-b-2" style={{ background: 'linear-gradient(135deg, #FFFAF0 0%, #FBF1DD 100%)', borderColor: '#C4A87A' }}>
       <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between flex-wrap gap-4">
@@ -24,11 +24,19 @@ export default function Header({ syncing, lastSync }) {
               {/* 假日同步狀態 */}
               <span className="flex items-center gap-1 text-xs flex-shrink-0"
                 style={{ color: syncing ? '#C68B4F' : '#7A9474' }}
-                title={lastSync ? `假日資料上次更新：${lastSync.toLocaleString('zh-TW')}` : '假日資料更新中...'}>
+                title={lastSync ? `假日上次更新：${lastSync.toLocaleString('zh-TW')}` : '更新中...'}>
                 <span className="w-1.5 h-1.5 rounded-full"
                   style={{ background: syncing ? '#C68B4F' : '#7A9474',
                            animation: syncing ? 'pulse 1.5s infinite' : 'none' }}></span>
                 {syncing ? '假日更新中' : '假日已更新'}
+              </span>
+              {/* 連線狀態 */}
+              <span className="flex items-center gap-1 text-xs flex-shrink-0"
+                style={{ color: isOnline ? '#7A9474' : '#C68B4F' }}
+                title={isOnline ? '已連接 Supabase 雲端資料庫' : '離線模式（資料存於本機）'}>
+                <span className="w-1.5 h-1.5 rounded-full"
+                  style={{ background: isOnline ? '#7A9474' : '#C68B4F' }}></span>
+                {isOnline ? '雲端同步' : '離線模式'}
               </span>
             </div>
           </div>
