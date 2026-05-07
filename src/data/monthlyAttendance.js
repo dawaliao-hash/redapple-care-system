@@ -1,27 +1,25 @@
 import { RECIPIENTS } from './recipients.js'
-
-// 台灣 2026 年國定假日
-export const TW_HOLIDAYS = {
-  '2026/01/01': '元旦',
-  '2026/02/16': '除夕',
-  '2026/02/17': '春節',
-  '2026/02/18': '初二',
-  '2026/02/19': '初三',
-  '2026/02/20': '初四補假',
-  '2026/02/28': '和平紀念日',
-  '2026/04/03': '兒童節補假',
-  '2026/04/04': '兒童節',
-  '2026/04/05': '清明節',
-  '2026/05/01': '勞動節',
-  '2026/06/19': '端午節',
-  '2026/09/24': '中秋節',
-  '2026/10/10': '國慶日',
-}
+import { getMergedHolidays } from './holidays.js'
 
 export const formatDisplayDate = (d) =>
   `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
 
-// 初始化今日出缺席（配合 App.jsx 的 defaultAttendance）
+// 向外匯出合併假日（供各 View 使用）
+export const TW_HOLIDAYS = getMergedHolidays(2025, 2026, 2027)
+
+// 隨機分配歷史日期狀態（模擬）
+const randomStatus = (seed) => {
+  const v = seed % 100
+  if (v < 76) return 'present'
+  if (v < 86) return 'rest'
+  if (v < 91) return 'hospital'
+  if (v < 95) return 'clinic'
+  if (v < 97) return 'blood'
+  if (v < 99) return 'respite'
+  return 'absent'
+}
+
+// 今日預設出缺席
 const buildTodayAttendance = () => {
   const base = {}
   RECIPIENTS.forEach(r => {
@@ -35,45 +33,51 @@ const buildTodayAttendance = () => {
   return base
 }
 
-// 隨機分配歷史日期狀態（模擬真實比例）
-const randomStatus = (seed) => {
-  const v = seed % 100
-  if (v < 76) return 'present'
-  if (v < 86) return 'rest'
-  if (v < 91) return 'hospital'
-  if (v < 95) return 'clinic'
-  if (v < 97) return 'blood'
-  if (v < 99) return 'respite'
-  return 'absent'
+// 產生某日的假日狀態（全員設為 holiday）
+const buildHolidayAttendance = () => {
+  const base = {}
+  RECIPIENTS.forEach(r => { base[r.id] = 'holiday' })
+  return base
 }
 
 export const generateMonthlyAttendance = () => {
-  const today    = new Date()
+  const today   = new Date()
+  today.setHours(0, 0, 0, 0)
   const todayStr = formatDisplayDate(today)
   const result   = {}
 
-  // 產生本月每個工作日（今天以前）的模擬資料
   const year  = today.getFullYear()
   const month = today.getMonth() + 1
 
-  for (let day = 1; day <= today.getDate(); day++) {
-    const d   = new Date(year, month - 1, day)
+  // 合併靜態 + 快取假日資料
+  const holidays = getMergedHolidays(year - 1, year, year + 1)
+
+  // 本月每一天
+  for (let day = 1; day <= 31; day++) {
+    const d = new Date(year, month - 1, day)
+    if (d.getMonth() !== month - 1) break
+
     const dow = d.getDay()
-    if (dow === 0 || dow === 6) continue // 跳過週末
+    if (dow === 0 || dow === 6) continue // 週末不生成
 
-    const dk = formatDisplayDate(d)
+    const dk      = formatDisplayDate(d)
+    const holi    = holidays[dk]
+    const isPast  = d < today
+    const isToday = dk === todayStr
 
-    if (dk === todayStr) {
+    if (holi) {
+      // 國定假日：全員預設「假日」
+      result[dk] = buildHolidayAttendance()
+    } else if (isToday) {
       result[dk] = buildTodayAttendance()
-    } else {
+    } else if (isPast) {
       const dayData = {}
       RECIPIENTS.forEach((r, ri) => {
-        // 以日期+index 為種子，讓每次重整結果一致
-        const seed = day * 31 + ri * 7 + r.id.charCodeAt(1)
-        dayData[r.id] = randomStatus(seed)
+        dayData[r.id] = randomStatus(day * 31 + ri * 7 + r.id.charCodeAt(1))
       })
       result[dk] = dayData
     }
+    // 未來非假日：留空（undefined），表示尚未設定
   }
 
   return result

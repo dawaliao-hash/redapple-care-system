@@ -5,7 +5,7 @@ import { STATUS_TYPES } from '../data/statusTypes.js'
 import FilterChip from '../components/FilterChip.jsx'
 import { todayStr, weekDay } from '../utils/date.js'
 
-export default function AttendanceView({ attendance, setAttendance, onSelectRecipient }) {
+export default function AttendanceView({ attendance, setAttendance, onSelectRecipient, holidays = {} }) {
   const { recipients: RECIPIENTS, caregivers: CAREGIVERS } = useData()
   const [filterStatus, setFilterStatus] = useState('all')
   const [search, setSearch] = useState('')

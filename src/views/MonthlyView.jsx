@@ -2,9 +2,9 @@ import { useState, useMemo } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { STATUS_TYPES } from '../data/statusTypes.js'
-import { TW_HOLIDAYS, formatDisplayDate } from '../data/monthlyAttendance.js'
+import { formatDisplayDate } from '../data/monthlyAttendance.js'
 
-// 月度表用的短符號
+// 月度表用的短符號（含假日）
 const SHORT = {
   present:  { label: '✓', bg: '#DFF0E0', text: '#2E6E3E' },
   rest:     { label: '休', bg: '#F5E6D3', text: '#A0541E' },
@@ -12,11 +12,13 @@ const SHORT = {
   clinic:   { label: '診', bg: '#D8E2EA', text: '#2D4F6A' },
   blood:    { label: '抽', bg: '#EDD8DC', text: '#8B3A4A' },
   respite:  { label: '喘', bg: '#E2D5E8', text: '#5C2D6A' },
+  holiday:  { label: '假', bg: '#F0EBF8', text: '#6A3D8E' },
   absent:   { label: '✕', bg: '#EAE5DA', text: '#6B5D4A' },
 }
 
-// 狀態循環順序（點擊切換）
-const STATUS_CYCLE = ['present', 'rest', 'hospital', 'clinic', 'blood', 'respite', 'absent', '']
+// 狀態循環：假日日期從 holiday 開始，一般日從 present 開始
+const STATUS_CYCLE      = ['present', 'rest', 'hospital', 'clinic', 'blood', 'respite', 'holiday', 'absent', '']
+const STATUS_CYCLE_HOLI = ['holiday', 'present', 'rest', 'hospital', 'clinic', 'blood', 'respite', 'absent', '']
 
 const WD = ['日','一','二','三','四','五','六']
 
@@ -30,7 +32,7 @@ function getDaysInMonth(year, month) {
   return days
 }
 
-export default function MonthlyView({ monthlyAttendance, setMonthlyAttendance }) {
+export default function MonthlyView({ monthlyAttendance, setMonthlyAttendance, holidays = {} }) {
   const { recipients: RECIPIENTS } = useData()
   const today = new Date()
   const [viewYear, setViewYear]   = useState(today.getFullYear())
@@ -53,12 +55,14 @@ export default function MonthlyView({ monthlyAttendance, setMonthlyAttendance })
 
   const todayStr = formatDisplayDate(today)
 
-  // 點擊格子循環切換狀態
+  // 點擊格子循環切換狀態（假日日期使用 holiday 優先的循環）
   const toggleStatus = (recipientId, d) => {
-    const dk = formatDisplayDate(d)
-    const cur = monthlyAttendance[dk]?.[recipientId] ?? ''
-    const idx  = STATUS_CYCLE.indexOf(cur)
-    const next = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length]
+    const dk    = formatDisplayDate(d)
+    const holi  = holidays[dk]
+    const cur   = monthlyAttendance[dk]?.[recipientId] ?? (holi ? 'holiday' : '')
+    const cycle = holi ? STATUS_CYCLE_HOLI : STATUS_CYCLE
+    const idx   = cycle.indexOf(cur)
+    const next  = cycle[(idx + 1) % cycle.length]
     setMonthlyAttendance(prev => ({
       ...prev,
       [dk]: { ...(prev[dk] ?? {}), [recipientId]: next },
@@ -135,11 +139,10 @@ export default function MonthlyView({ monthlyAttendance, setMonthlyAttendance })
               {s.label} {STATUS_TYPES[key]?.label}
             </span>
           ))}
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
-            style={{ background: '#F0EBF8', color: '#8E6BA8' }}>
-            假 國定假日
-          </span>
         </div>
+        <p className="text-xs w-full" style={{ color: '#8B6F47' }}>
+          點擊格子切換狀態 · 假日預設「假」，可手動調整為其他狀態 · 橫向滑動查看全月
+        </p>
       </div>
 
       {/* ── 月度表格 ── */}
@@ -157,7 +160,7 @@ export default function MonthlyView({ monthlyAttendance, setMonthlyAttendance })
                 {/* 日期欄 */}
                 {workDays.map(d => {
                   const dk     = formatDisplayDate(d)
-                  const holi   = TW_HOLIDAYS[dk]
+                  const holi   = holidays[dk]
                   const isToday = dk === todayStr
                   return (
                     <th key={dk} style={{
@@ -197,24 +200,16 @@ export default function MonthlyView({ monthlyAttendance, setMonthlyAttendance })
                     </td>
                     {/* 每日格子 */}
                     {workDays.map(d => {
-                      const dk       = formatDisplayDate(d)
-                      const holi     = TW_HOLIDAYS[dk]
-                      const isToday  = dk === todayStr
-                      const isFuture = d > today && dk !== todayStr
-                      const sKey     = monthlyAttendance[dk]?.[r.id] ?? ''
-                      const s        = sKey ? SHORT[sKey] : null
+                      const dk         = formatDisplayDate(d)
+                      const holi       = holidays[dk]
+                      const isToday    = dk === todayStr
+                      const isFuture   = d > today && dk !== todayStr
+                      // 假日預設 'holiday'，否則看 monthlyAttendance
+                      const storedKey  = monthlyAttendance[dk]?.[r.id]
+                      const sKey       = storedKey ?? (holi ? 'holiday' : '')
+                      const s          = sKey ? SHORT[sKey] : null
 
-                      // 假日且無填寫 → 顯示「假」
-                      if (holi && !sKey) {
-                        return (
-                          <td key={dk} style={tdBase}>
-                            <div style={cellStyle({ bg: '#F0EBF8', color: '#8E6BA8', border: 'none' })}>
-                              假
-                            </div>
-                          </td>
-                        )
-                      }
-                      // 未來且無填寫 → 空白
+                      // 未來非假日且無資料 → 空白（不可點擊）
                       if (isFuture && !sKey) {
                         return (
                           <td key={dk} style={tdBase}>
@@ -222,12 +217,12 @@ export default function MonthlyView({ monthlyAttendance, setMonthlyAttendance })
                           </td>
                         )
                       }
-                      // 可點擊格子
+                      // 所有其他格子（含假日）→ 可點擊切換
                       return (
                         <td key={dk} style={tdBase}>
                           <button
                             onClick={() => toggleStatus(r.id, d)}
-                            title={sKey ? STATUS_TYPES[sKey]?.label : '點擊設定狀態'}
+                            title={sKey ? (STATUS_TYPES[sKey]?.label + (holi ? `（${holi}）` : '')) : '點擊設定狀態'}
                             style={cellStyle({
                               bg:     s ? s.bg : (isToday ? '#FBF0E8' : '#FAFAF5'),
                               color:  s ? s.text : '#C4A87A',
