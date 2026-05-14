@@ -176,10 +176,19 @@ function CaregiverModal({ initial, allRecipients, onSave, onClose }) {
     () => allRecipients.filter(r => r.primaryCaregiver === initial?.id).map(r => r.id)
   )
 
+  const MAX = 8
+  const overLimit = selectedIds.length > MAX
+
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  const toggleRecipient = (id) =>
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  const toggleRecipient = (id) => {
+    setSelectedIds(prev => {
+      if (prev.includes(id)) return prev.filter(x => x !== id)
+      // 勾選時若已達上限，更新 err 提示但不阻止（讓 handleSave 把關）
+      return [...prev, id]
+    })
+    setErr('')   // 清除舊錯誤，讓即時計數提示負責
+  }
 
   const filteredRecs = allRecipients.filter(r =>
     !recSearch || r.name.includes(recSearch) || r.code.includes(recSearch)
@@ -187,6 +196,10 @@ function CaregiverModal({ initial, allRecipients, onSave, onClose }) {
 
   const handleSave = () => {
     if (!form.name.trim()) { setErr('請填寫姓名'); return }
+    if (overLimit) {
+      setErr(`已選 ${selectedIds.length} 位，超過每位照服員 ${MAX} 位上限，請取消部分選取後再儲存。`)
+      return
+    }
     onSave({ ...form, avatar: form.name[0] ?? '?' }, selectedIds)
   }
 
@@ -211,22 +224,53 @@ function CaregiverModal({ initial, allRecipients, onSave, onClose }) {
             </Field>
           </div>
 
-          {/* 預覽 */}
+          {/* 預覽 + 即時計數 */}
           <div className="flex items-center gap-3 p-3 rounded-xl border"
-            style={{ background: '#FBF6EC', borderColor: '#E5D5B7' }}>
+            style={{
+              background: overLimit ? 'rgba(165,56,56,0.06)' : '#FBF6EC',
+              borderColor: overLimit ? '#A53838' : '#E5D5B7',
+            }}>
             <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
               style={{ background: form.color }}>{form.name[0] ?? '？'}</div>
-            <div>
+            <div className="flex-1">
               <div className="font-display font-semibold text-sm" style={{ color: '#5C2828' }}>{form.name || '姓名預覽'}</div>
-              <div className="text-xs" style={{ color: '#8B6F47' }}>已選 {selectedIds.length} 位長者</div>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="text-xs font-bold"
+                  style={{ color: overLimit ? '#A53838' : selectedIds.length === MAX ? '#C68B4F' : '#7A9474' }}>
+                  {selectedIds.length} / {MAX}
+                </span>
+                <span className="text-xs" style={{ color: '#8B6F47' }}>位長者</span>
+                {overLimit && (
+                  <span className="text-xs font-semibold px-1.5 py-0.5 rounded"
+                    style={{ background: '#A53838', color: 'white' }}>
+                    超過上限 {selectedIds.length - MAX} 位
+                  </span>
+                )}
+                {!overLimit && selectedIds.length === MAX && (
+                  <span className="text-xs px-1.5 py-0.5 rounded"
+                    style={{ background: '#FBE8DC', color: '#A53838' }}>已滿</span>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* 超過上限時的錯誤橫幅 */}
+          {overLimit && (
+            <div className="flex items-start gap-2 px-4 py-3 rounded-xl border"
+              style={{ background: '#FBE8DC', borderColor: '#A53838' }}>
+              <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" style={{ color: '#A53838' }} />
+              <p className="text-sm" style={{ color: '#5C2828' }}>
+                已選 <strong>{selectedIds.length}</strong> 位，超過每位照服員 <strong>{MAX}</strong> 位的服務上限。
+                請取消至少 <strong>{selectedIds.length - MAX}</strong> 位後才能儲存。
+              </p>
+            </div>
+          )}
 
           {/* 指定負責長者 */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-medium" style={{ color: '#8B6F47' }}>
-                指定負責長者（可多選，已選 {selectedIds.length} 位）
+                指定負責長者（可多選，上限 {MAX} 位）
               </label>
               <button className="text-xs underline" style={{ color: '#A53838' }}
                 onClick={() => setSelectedIds([])}>全部取消</button>
@@ -283,9 +327,17 @@ function CaregiverModal({ initial, allRecipients, onSave, onClose }) {
           <button onClick={onClose}
             className="px-4 py-2 rounded-lg text-sm border transition hover:bg-orange-50"
             style={{ borderColor: '#C4A87A', color: '#5C3A1E' }}>取消</button>
-          <button onClick={handleSave}
-            className="px-5 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
-            style={{ background: '#A53838', color: 'white' }}>
+          <button
+            onClick={handleSave}
+            disabled={overLimit}
+            className="px-5 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition"
+            style={{
+              background: overLimit ? '#D9C9A8' : '#A53838',
+              color:      overLimit ? '#8B6F47' : 'white',
+              cursor:     overLimit ? 'not-allowed' : 'pointer',
+            }}
+            title={overLimit ? `請先取消 ${selectedIds.length - MAX} 位長者` : undefined}
+          >
             <Check size={15} />{isNew ? '新增' : '儲存'}
           </button>
         </div>
