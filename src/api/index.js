@@ -210,3 +210,36 @@ export async function insertHealthRecord(recipientId, record) {
   if (error) throw error
   return hrFromRow(data)
 }
+
+// 按日期 upsert（若同日已有資料則先刪再插入）
+export async function upsertHealthRecordByDate(recipientId, record) {
+  if (!isOnline) return record
+  // 先刪除同一天的舊紀錄
+  await supabase
+    .from('health_records')
+    .delete()
+    .eq('recipient_id', recipientId)
+    .eq('full_date', record.fullDate)
+  // 再插入新的
+  const { data, error } = await supabase
+    .from('health_records')
+    .insert(hrToRow(recipientId, record))
+    .select()
+    .single()
+  if (error) throw error
+  return hrFromRow(data)
+}
+
+// 取得特定月份的健康紀錄
+export async function fetchHealthRecordsForMonth(recipientId, year, month) {
+  if (!isOnline) return []
+  const prefix = `${year}/${String(month).padStart(2, '0')}`
+  const { data, error } = await supabase
+    .from('health_records')
+    .select('*')
+    .eq('recipient_id', recipientId)
+    .like('full_date', `${prefix}%`)
+    .order('full_date', { ascending: true })
+  if (error) { console.error('[API] fetchHealthRecordsForMonth:', error); return [] }
+  return data.map(hrFromRow)
+}
