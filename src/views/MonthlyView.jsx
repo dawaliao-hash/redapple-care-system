@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useState, useMemo, useRef, useCallback } from 'react'
+import { ChevronLeft, ChevronRight, GripVertical } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { STATUS_TYPES } from '../data/statusTypes.js'
 import { formatDisplayDate } from '../data/monthlyAttendance.js'
@@ -32,8 +32,64 @@ function getDaysInMonth(year, month) {
   return days
 }
 
-export default function MonthlyView({ monthlyAttendance, setMonthlyAttendance, holidays = {} }) {
+export default function MonthlyView({
+  monthlyAttendance, setMonthlyAttendance,
+  recipientOrder = [], setRecipientOrder,  // 共用排序
+  holidays = {},
+}) {
   const { recipients: RECIPIENTS } = useData()
+
+  // 依共用 recipientOrder 排列（新增長者接在最後）
+  const SORTED_RECIPIENTS = useMemo(() => {
+    const ordered  = recipientOrder.filter(id => RECIPIENTS.find(r => r.id === id))
+    const unordered = RECIPIENTS.filter(r => !recipientOrder.includes(r.id))
+    return [...ordered.map(id => RECIPIENTS.find(r => r.id === id)), ...unordered].filter(Boolean)
+  }, [recipientOrder, RECIPIENTS])
+
+  // ── 行拖曳排序 ──────────────────────────────────────────
+  const [dragId,     setDragId]     = useState(null)
+  const [dragOverId, setDragOverId] = useState(null)
+  const [dragAbove,  setDragAbove]  = useState(true)
+  const dragNode = useRef(null)
+
+  const handleDragStart = useCallback((e, id) => {
+    setDragId(id)
+    dragNode.current = e.currentTarget
+    e.dataTransfer.effectAllowed = 'move'
+    requestAnimationFrame(() => { if (dragNode.current) dragNode.current.style.opacity = '0.4' })
+  }, [])
+
+  const handleDragEnd = useCallback(() => {
+    if (dragNode.current) dragNode.current.style.opacity = ''
+    setDragId(null); setDragOverId(null); dragNode.current = null
+  }, [])
+
+  const handleDragOver = useCallback((e, id) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (id === dragId) { setDragOverId(null); return }
+    const rect = e.currentTarget.getBoundingClientRect()
+    setDragAbove(e.clientY < rect.top + rect.height / 2)
+    setDragOverId(id)
+  }, [dragId])
+
+  const handleDrop = useCallback((e, targetId) => {
+    e.preventDefault()
+    if (!dragId || dragId === targetId) return
+    setRecipientOrder?.(prev => {
+      const base = SORTED_RECIPIENTS.map(r => r.id)
+      const fromIdx = base.indexOf(dragId)
+      const toIdx   = base.indexOf(targetId)
+      if (fromIdx === -1 || toIdx === -1) return prev
+      const next = [...base]
+      next.splice(fromIdx, 1)
+      const insertAt = dragAbove ? toIdx : toIdx + 1
+      next.splice(insertAt > fromIdx ? insertAt - 1 : insertAt, 0, dragId)
+      return next
+    })
+    setDragId(null); setDragOverId(null)
+  }, [dragId, dragAbove, SORTED_RECIPIENTS, setRecipientOrder])
+
   const today = new Date()
   const [viewYear, setViewYear]   = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth() + 1)
@@ -153,10 +209,12 @@ export default function MonthlyView({ monthlyAttendance, setMonthlyAttendance, h
             {/* ── 表頭：日期行 ── */}
             <thead>
               <tr style={{ background: '#FBF1DD' }}>
+                {/* 拖曳把手欄 */}
+                <th style={thSticky({ minWidth: 22, padding: '4px 2px' })}></th>
                 {/* 序號欄 */}
-                <th style={thSticky({ minWidth: 28 })}>序</th>
+                <th style={thSticky({ minWidth: 28, left: 22 })}>序</th>
                 {/* 姓名欄 */}
-                <th style={thSticky({ minWidth: 80, left: 28 })}>姓名</th>
+                <th style={thSticky({ minWidth: 80, left: 50 })}>姓名</th>
                 {/* 日期欄 */}
                 {workDays.map(d => {
                   const dk     = formatDisplayDate(d)
@@ -185,16 +243,34 @@ export default function MonthlyView({ monthlyAttendance, setMonthlyAttendance, h
 
             {/* ── 表身：長者列 ── */}
             <tbody>
-              {RECIPIENTS.map((r, idx) => {
-                const rowBg = idx % 2 === 0 ? '#FFFFFF' : '#FFFAF0'
+              {SORTED_RECIPIENTS.map((r, idx) => {
+                const rowBg   = idx % 2 === 0 ? '#FFFFFF' : '#FFFAF0'
+                const isOver  = dragOverId === r.id
+                const isDragging = dragId === r.id
                 return (
-                  <tr key={r.id}>
+                  <tr
+                    key={r.id}
+                    draggable
+                    onDragStart={e => handleDragStart(e, r.id)}
+                    onDragEnd={handleDragEnd}
+                    onDragOver={e => handleDragOver(e, r.id)}
+                    onDrop={e => handleDrop(e, r.id)}
+                    style={{
+                      opacity: isDragging ? 0.4 : 1,
+                      borderTop:    isOver && dragAbove  ? '2.5px solid #A53838' : undefined,
+                      borderBottom: isOver && !dragAbove ? '2.5px solid #A53838' : undefined,
+                    }}
+                  >
+                    {/* 拖曳把手 */}
+                    <td style={{ ...tdSticky(rowBg), left: 0, minWidth: 22, padding: '2px 2px', textAlign: 'center', cursor: 'grab' }}>
+                      <GripVertical size={13} style={{ color: '#C4A87A' }} />
+                    </td>
                     {/* 序號 */}
-                    <td style={{ ...tdSticky(rowBg), left: 0, minWidth: 28, color: '#A09684', textAlign: 'center' }}>
+                    <td style={{ ...tdSticky(rowBg), left: 22, minWidth: 28, color: '#A09684', textAlign: 'center' }}>
                       {idx + 1}
                     </td>
                     {/* 姓名 */}
-                    <td style={{ ...tdSticky(rowBg), left: 28, minWidth: 80 }}>
+                    <td style={{ ...tdSticky(rowBg), left: 50, minWidth: 80 }}>
                       <div style={{ fontWeight: 600, color: '#5C2828' }}>{r.name}</div>
                       <div style={{ fontSize: 9, color: '#A09684', fontFamily: 'monospace' }}>{r.code}</div>
                     </td>
@@ -247,7 +323,7 @@ export default function MonthlyView({ monthlyAttendance, setMonthlyAttendance, h
 
               {/* ── 每日合計列 ── */}
               <tr style={{ background: '#FBF1DD', borderTop: '2px solid #C4A87A' }}>
-                <td colSpan={2}
+                <td colSpan={3}
                   style={{ ...tdSticky('#FBF1DD'), left: 0, fontWeight: 700, color: '#5C2828',
                     fontSize: 11, textAlign: 'center', borderRight: '2px solid #C4A87A' }}>
                   每日人數
@@ -276,7 +352,7 @@ export default function MonthlyView({ monthlyAttendance, setMonthlyAttendance, h
       {/* 圖示說明 */}
       <p className="text-xs text-center" style={{ color: '#A09684' }}>
         民國 {ROC} 年 {viewMonth} 月服務對象照顧服務紀錄表 ·
-        共 {RECIPIENTS.length} 位服務對象 · 工作日 {workDays.length} 天
+        共 {SORTED_RECIPIENTS.length} 位服務對象 · 工作日 {workDays.length} 天
       </p>
     </div>
   )

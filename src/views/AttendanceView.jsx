@@ -3,19 +3,16 @@ import { Search, GripVertical, RotateCcw } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { STATUS_TYPES } from '../data/statusTypes.js'
 import FilterChip from '../components/FilterChip.jsx'
-import { useLocalStorage } from '../utils/useLocalStorage.js'
 import { todayStr, weekDay } from '../utils/date.js'
 
-export default function AttendanceView({ attendance, setAttendance, onSelectRecipient, holidays = {} }) {
+export default function AttendanceView({
+  attendance, setAttendance,
+  recipientOrder, setRecipientOrder,   // 由 App.jsx 傳入，與月度點名、配對總覽共用
+  onSelectRecipient, holidays = {},
+}) {
   const { recipients: RECIPIENTS, caregivers: CAREGIVERS } = useData()
   const [filterStatus, setFilterStatus] = useState('all')
   const [search, setSearch]             = useState('')
-
-  // ── 自訂排序（存入 localStorage，跨重整保留）───────────────
-  const [recipientOrder, setRecipientOrder] = useLocalStorage(
-    'redapple_attendance_order',
-    () => RECIPIENTS.map(r => r.id)
-  )
 
   // 根據 recipientOrder 排列長者清單（新增的長者接在最後）
   const sortedRecipients = useMemo(() => {
@@ -78,7 +75,7 @@ export default function AttendanceView({ attendance, setAttendance, onSelectReci
     e.preventDefault()
     if (!dragId || dragId === targetId) return
 
-    setRecipientOrder(prev => {
+    setRecipientOrder?.(prev => {
       // 建立以目前 sortedRecipients 為基礎的順序（確保 filtered 中排好的也能正確移動）
       const base = sortedRecipients.map(r => r.id)
       const fromIdx = base.indexOf(dragId)
@@ -96,7 +93,7 @@ export default function AttendanceView({ attendance, setAttendance, onSelectReci
     setDragOverId(null)
   }, [dragId, dragAbove, sortedRecipients, setRecipientOrder])
 
-  const resetOrder = () => setRecipientOrder(RECIPIENTS.map(r => r.id))
+  const resetOrder = () => setRecipientOrder?.(RECIPIENTS.map(r => r.id))
 
   return (
     <div className="space-y-6">

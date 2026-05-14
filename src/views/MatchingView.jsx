@@ -114,9 +114,17 @@ const THRESHOLD = 8
 export default function MatchingView({
   monthlyAttendance, setMonthlyAttendance,
   dailyAssignments, setDailyAssignments, defaultAssignments,
+  recipientOrder = [],    // 共用排序（唯讀）
   onSelectRecipient,
 }) {
   const { recipients, caregivers } = useData()
+
+  // 依共用排序排列長者清單
+  const sortedRecipients = useMemo(() => {
+    const ordered   = recipientOrder.filter(id => recipients.find(r => r.id === id))
+    const unordered = recipients.filter(r => !recipientOrder.includes(r.id))
+    return [...ordered.map(id => recipients.find(r => r.id === id)), ...unordered].filter(Boolean)
+  }, [recipientOrder, recipients])
 
   // 選擇的日期
   const [selectedDate, setSelectedDate]   = useState(new Date(TODAY))
@@ -483,9 +491,9 @@ export default function MatchingView({
               </tr>
             </thead>
             <tbody>
-              {Array.from({ length: Math.ceil(recipients.length / 2) }).map((_, row) => {
-                const left  = recipients[row * 2]
-                const right = recipients[row * 2 + 1]
+              {Array.from({ length: Math.ceil(sortedRecipients.length / 2) }).map((_, row) => {
+                const left  = sortedRecipients[row * 2]
+                const right = sortedRecipients[row * 2 + 1]
                 return (
                   <tr key={row} className="border-t" style={{ borderColor: '#EAE0CC' }}>
                     {[left, right].map((r, col) => r ? (

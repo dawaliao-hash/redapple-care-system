@@ -33,6 +33,12 @@ function AppInner() {
     return m
   }, [recipients])
 
+  // ── 共用長者排序（三個畫面連動）─────────────────────────
+  const [recipientOrder, setRecipientOrder] = useLocalStorage(
+    'redapple_recipient_order',
+    () => recipients.map(r => r.id)
+  )
+
   const [tab, setTab] = useState('matching')
 
   // ── 月度出缺席（localStorage 快取 + Supabase 同步）──────────
@@ -164,15 +170,29 @@ function AppInner() {
             dailyAssignments={dailyAssignments}
             setDailyAssignments={setDailyAssignments}
             defaultAssignments={defaultAssignments}
+            recipientOrder={recipientOrder}
             onSelectRecipient={setSelectedRecipient}
             {...sharedProps}
           />
         )}
         {tab === 'monthly' && (
-          <MonthlyView monthlyAttendance={monthlyAttendance} setMonthlyAttendance={setMonthlyAttendance} {...sharedProps} />
+          <MonthlyView
+            monthlyAttendance={monthlyAttendance}
+            setMonthlyAttendance={setMonthlyAttendance}
+            recipientOrder={recipientOrder}
+            setRecipientOrder={setRecipientOrder}
+            {...sharedProps}
+          />
         )}
         {tab === 'attendance' && (
-          <AttendanceView attendance={attendance} setAttendance={setAttendance} onSelectRecipient={setSelectedRecipient} {...sharedProps} />
+          <AttendanceView
+            attendance={attendance}
+            setAttendance={setAttendance}
+            recipientOrder={recipientOrder}
+            setRecipientOrder={setRecipientOrder}
+            onSelectRecipient={setSelectedRecipient}
+            {...sharedProps}
+          />
         )}
         {tab === 'stats' && (
           <StatsView
