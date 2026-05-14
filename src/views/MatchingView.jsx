@@ -170,7 +170,7 @@ export default function MatchingView({
     const map = {}
     caregivers.forEach(c => { map[c.id] = [] })
     recipients.forEach(r => {
-      if (['present','respite','blood'].includes(attendance[r.id])) {
+      if (['present','respite'].includes(attendance[r.id])) {
         const cgId = assignments[r.id]
         if (cgId && map[cgId]) map[cgId].push(r)
       }
@@ -179,7 +179,7 @@ export default function MatchingView({
   }, [attendance, assignments, recipients, caregivers])
 
   const totalActive = useMemo(() =>
-    recipients.filter(r => ['present','respite','blood'].includes(attendance[r.id])).length,
+    recipients.filter(r => ['present','respite'].includes(attendance[r.id])).length,
     [attendance, recipients]
   )
 

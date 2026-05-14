@@ -3,7 +3,8 @@ import { X, ChevronRight } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { formatDisplayDate } from '../data/monthlyAttendance.js'
 
-const PRESENT_STATUSES = ['present', 'respite', 'blood']
+// 抽血視為未出席，不計入服務數量
+const PRESENT_STATUSES = ['present', 'respite']
 
 function CaregiverDayModal({ data, onClose, onSelectRecipient }) {
   return (
