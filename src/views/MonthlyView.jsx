@@ -285,24 +285,25 @@ export default function MonthlyView({
                       const sKey       = storedKey ?? (holi ? 'holiday' : '')
                       const s          = sKey ? SHORT[sKey] : null
 
-                      // 未來非假日且無資料 → 空白（不可點擊）
-                      if (isFuture && !sKey) {
-                        return (
-                          <td key={dk} style={tdBase}>
-                            <div style={cellStyle({ bg: '#F5F1EA', color: 'transparent', border: 'none' })}>·</div>
-                          </td>
-                        )
-                      }
-                      // 所有其他格子（含假日）→ 可點擊切換
+                      // 所有格子（含未來日期）→ 可點擊切換
+                      // 未來且已設定狀態 → 虛線框提示「預先設定」
+                      const isPreset = isFuture && !!sKey && sKey !== 'holiday'
                       return (
                         <td key={dk} style={tdBase}>
                           <button
                             onClick={() => toggleStatus(r.id, d)}
-                            title={sKey ? (STATUS_TYPES[sKey]?.label + (holi ? `（${holi}）` : '')) : '點擊設定狀態'}
+                            title={
+                              sKey
+                                ? (STATUS_TYPES[sKey]?.label + (holi ? `（${holi}）` : '') + (isPreset ? '（預設）' : ''))
+                                : (isFuture ? '點擊預先設定狀態' : '點擊設定狀態')
+                            }
                             style={cellStyle({
-                              bg:     s ? s.bg : (isToday ? '#FBF0E8' : '#FAFAF5'),
-                              color:  s ? s.text : '#C4A87A',
-                              border: isToday ? '1.5px solid #A53838' : '1px solid #E8E0D0',
+                              bg:     s ? s.bg : (isToday ? '#FBF0E8' : isFuture ? '#F5F1EA' : '#FAFAF5'),
+                              color:  s ? s.text : (isFuture ? '#C4A87A' : '#C4A87A'),
+                              border: isToday   ? '1.5px solid #A53838'
+                                    : isPreset  ? '1.5px dashed #A53838'
+                                    : isFuture  ? '1px dashed #C4A87A'
+                                    : '1px solid #E8E0D0',
                               fw:     s ? 700 : 400,
                               cursor: 'pointer',
                             })}
