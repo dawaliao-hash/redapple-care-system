@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, CalendarDays, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CalendarDays, X, AlertCircle } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { STATUS_TYPES } from '../data/statusTypes.js'
 import { TW_HOLIDAYS, formatDisplayDate } from '../data/monthlyAttendance.js'
@@ -183,6 +183,16 @@ export default function MatchingView({
     [attendance, recipients]
   )
 
+  // ── 上限提示 Toast ───────────────────────────────────
+  const [toast, setToast]    = useState(null)
+  const toastTimer           = useRef(null)
+
+  const showToast = useCallback((msg) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    setToast(msg)
+    toastTimer.current = setTimeout(() => setToast(null), 4000)
+  }, [])
+
   // ── Pointer Events 拖曳 ─────────────────────────────
   const [draggedId, setDraggedId] = useState(null)
   const drag = useRef({ id: null, ghost: null, offsetX: 0, offsetY: 0, startX: 0, startY: 0, moved: false })
@@ -231,12 +241,24 @@ export default function MatchingView({
     if (moved) {
       const els    = document.elementsFromPoint(e.clientX, e.clientY)
       const target = els.find(el => el.dataset.caregiverId)
-      if (target) setAssignments(prev => ({ ...prev, [id]: target.dataset.caregiverId }))
+      if (target) {
+        const cgId   = target.dataset.caregiverId
+        const curLen = counts[cgId]?.length ?? 0
+        const alreadyHere = assignments[id] === cgId
+
+        // 若非同一欄且目標已滿 8 人 → 拒絕並顯示 toast
+        if (!alreadyHere && curLen >= 8) {
+          const cgName = caregivers.find(c => c.id === cgId)?.name ?? '該照服員'
+          showToast(`${cgName}服務的長者數量已達 8 位上限，請重新選擇。`)
+        } else {
+          setAssignments(prev => ({ ...prev, [id]: cgId }))
+        }
+      }
     } else {
       const r = recipients.find(x => x.id === id)
       if (r) onSelectRecipient(r)
     }
-  }, [recipients, setAssignments, onSelectRecipient])
+  }, [recipients, caregivers, counts, assignments, setAssignments, onSelectRecipient, showToast])
 
   const isDragging = draggedId !== null
   const holiday    = TW_HOLIDAYS[dateStr]
@@ -249,6 +271,33 @@ export default function MatchingView({
 
   return (
     <div className="space-y-4">
+
+      {/* ── 超配 Toast 提示 ── */}
+      {toast && (
+        <div
+          className="fixed top-6 left-1/2 z-[9999] flex items-start gap-3 px-5 py-4 rounded-2xl shadow-2xl"
+          style={{
+            transform: 'translateX(-50%)',
+            background: '#FBE8DC',
+            border: '2px solid #A53838',
+            maxWidth: 420,
+            width: 'calc(100vw - 48px)',
+            animation: 'slideDown 0.25s ease',
+          }}
+        >
+          <style>{`
+            @keyframes slideDown {
+              from { opacity: 0; transform: translateX(-50%) translateY(-16px); }
+              to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+            }
+          `}</style>
+          <AlertCircle size={20} className="flex-shrink-0 mt-0.5" style={{ color: '#A53838' }} />
+          <p className="flex-1 text-sm font-medium" style={{ color: '#5C2828' }}>{toast}</p>
+          <button onClick={() => setToast(null)} className="flex-shrink-0 p-0.5 rounded hover:opacity-70 transition">
+            <X size={16} style={{ color: '#A53838' }} />
+          </button>
+        </div>
+      )}
 
       {/* ── 日期選擇列 ── */}
       <div className="rounded-2xl p-4 border flex flex-wrap items-center gap-3 justify-between"
