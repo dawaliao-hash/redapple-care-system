@@ -66,7 +66,7 @@ export default function AttendanceView({ attendance, setAttendance, onSelectReci
             </thead>
             <tbody>
               {filtered.map((r, idx) => {
-                const s = STATUS_TYPES[attendance[r.id]]
+                const s = STATUS_TYPES[attendance[r.id]] ?? STATUS_TYPES.present
                 const cg = CAREGIVERS.find(c => c.id === r.primaryCaregiver)
                 return (
                   <tr key={r.id} className="border-t hover:bg-orange-50 transition" style={{ borderColor: '#EAE0CC' }}>

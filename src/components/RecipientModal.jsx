@@ -26,7 +26,7 @@ function MiniVital({ label, value }) {
 export default function RecipientModal({ recipient, healthRecords, attendance, onClose }) {
   const { caregivers } = useData()
   const cg = caregivers.find(c => c.id === recipient.primaryCaregiver)
-  const status = STATUS_TYPES[attendance]
+  const status = STATUS_TYPES[attendance] ?? null
   const last = healthRecords[healthRecords.length - 1]
 
   return (
@@ -145,7 +145,7 @@ export default function RecipientModal({ recipient, healthRecords, attendance, o
                 }
                 const isToday = i === 13
                 const stKey = isToday ? attendance : (Math.random() > 0.85 ? 'rest' : 'present')
-                const st = STATUS_TYPES[stKey]
+                const st = STATUS_TYPES[stKey] ?? STATUS_TYPES.present
                 return (
                   <div key={i} className="flex flex-col items-center" style={{ width: 38 }}>
                     <div className="text-xs mb-1" style={{ color: isToday ? '#A53838' : '#8B6F47', fontWeight: isToday ? 700 : 400 }}>
