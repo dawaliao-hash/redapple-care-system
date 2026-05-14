@@ -1,6 +1,9 @@
 import { useState, useMemo } from 'react'
 import { X, ChevronRight } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
+import { formatDisplayDate } from '../data/monthlyAttendance.js'
+
+const PRESENT_STATUSES = ['present', 'respite', 'blood']
 
 function CaregiverDayModal({ data, onClose, onSelectRecipient }) {
   return (
@@ -52,7 +55,11 @@ function CaregiverDayModal({ data, onClose, onSelectRecipient }) {
   )
 }
 
-export default function StatsView({ attendance, assignments, onSelectRecipient }) {
+export default function StatsView({
+  attendance, assignments,
+  monthlyAttendance = {}, dailyAssignments = {},
+  onSelectRecipient,
+}) {
   const { recipients: RECIPIENTS, caregivers: CAREGIVERS } = useData()
   const [selectedCg, setSelectedCg] = useState(null)
 
@@ -65,6 +72,7 @@ export default function StatsView({ attendance, assignments, onSelectRecipient }
       if (dow === 0 || dow === 6) continue
       arr.push({
         date: d,
+        dk: formatDisplayDate(d),   // 'YYYY/MM/DD' 用來查 monthlyAttendance
         label: `${d.getMonth() + 1}/${d.getDate()}`,
         wd: ['日','一','二','三','四','五','六'][dow],
         isToday: i === 0,
@@ -73,33 +81,35 @@ export default function StatsView({ attendance, assignments, onSelectRecipient }
     return arr
   }, [])
 
+  // 核心邏輯：配對分配 × 實際出席 = 真實服務數
   const matrix = useMemo(() => {
     const m = {}
     CAREGIVERS.forEach(c => { m[c.id] = {} })
-    days.forEach((day, idx) => {
+
+    days.forEach(day => {
+      // 取得當日出缺席（今日用 attendance prop，歷史用 monthlyAttendance）
+      const dayAtt = day.isToday
+        ? attendance
+        : (monthlyAttendance[day.dk] ?? {})
+
+      // 取得當日配對（若有每日配對紀錄則用之，否則用 primaryCaregiver）
+      const dayAsgn = dailyAssignments[day.dk] ?? null
+
       CAREGIVERS.forEach(cg => {
-        if (day.isToday) {
-          const list = RECIPIENTS.filter(r =>
-            ['present','respite','blood'].includes(attendance[r.id]) && assignments[r.id] === cg.id
-          )
-          m[cg.id][day.label] = { count: list.length, recipients: list }
-        } else {
-          const seed = (idx * 13 + cg.id.charCodeAt(1)) % 5
-          const count = 5 + seed
-          const recs = RECIPIENTS.filter(r => r.primaryCaregiver === cg.id).slice(0, count)
-          if (recs.length < count) {
-            const extras = RECIPIENTS.filter(r => r.primaryCaregiver !== cg.id)
-            for (const r of extras) {
-              if (recs.length >= count) break
-              recs.push(r)
-            }
-          }
-          m[cg.id][day.label] = { count, recipients: recs.slice(0, count) }
-        }
+        const list = RECIPIENTS.filter(r => {
+          // ① 誰負責這位長者（今日配對 > 每日配對記錄 > 機構預設主責）
+          const assignedTo = day.isToday
+            ? (assignments[r.id] ?? r.primaryCaregiver)
+            : (dayAsgn ? (dayAsgn[r.id] ?? r.primaryCaregiver) : r.primaryCaregiver)
+          if (assignedTo !== cg.id) return false
+          // ② 長者當天實際出席（出席/抽血/喘息才算服務）
+          return PRESENT_STATUSES.includes(dayAtt[r.id])
+        })
+        m[cg.id][day.label] = { count: list.length, recipients: list }
       })
     })
     return m
-  }, [days, attendance, assignments, CAREGIVERS, RECIPIENTS])   // ← 補上依賴
+  }, [days, attendance, assignments, monthlyAttendance, dailyAssignments, CAREGIVERS, RECIPIENTS])
 
   const totals = useMemo(() => {
     const t = {}

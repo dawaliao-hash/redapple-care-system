@@ -161,49 +161,118 @@ function RecipientModal({ initial, caregivers, onSave, onClose }) {
 }
 
 // ════════════════════════════════════════════════════════
-// 照服員表單 Modal
+// 照服員表單 Modal（含指定負責長者）
 // ════════════════════════════════════════════════════════
-function CaregiverModal({ initial, onSave, onClose }) {
+function CaregiverModal({ initial, allRecipients, onSave, onClose }) {
   const isNew = !initial?.id
   const [form, setForm] = useState(initial ?? {
     id: `c${Date.now()}`, name: '', avatar: '', color: CG_COLORS[0],
   })
   const [err, setErr] = useState('')
+  const [recSearch, setRecSearch] = useState('')
+
+  // 目前已分配給此照服員的長者 ID 清單
+  const [selectedIds, setSelectedIds] = useState(
+    () => allRecipients.filter(r => r.primaryCaregiver === initial?.id).map(r => r.id)
+  )
+
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const toggleRecipient = (id) =>
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+
+  const filteredRecs = allRecipients.filter(r =>
+    !recSearch || r.name.includes(recSearch) || r.code.includes(recSearch)
+  )
 
   const handleSave = () => {
     if (!form.name.trim()) { setErr('請填寫姓名'); return }
-    onSave({ ...form, avatar: form.name[0] ?? '?' })
+    onSave({ ...form, avatar: form.name[0] ?? '?' }, selectedIds)
   }
 
   return (
     <Overlay onClose={onClose}>
-      <ModalBox title={isNew ? '新增照服員' : `編輯：${initial.name}`} onClose={onClose} maxW={420}>
+      <ModalBox title={isNew ? '新增照服員' : `編輯：${initial.name}`} onClose={onClose} maxW={560}>
         <div className="space-y-4">
-          <Field label="姓名 *">
-            <input className={inputCls} style={inputSt} value={form.name}
-              onChange={e => set('name', e.target.value)} placeholder="例：魏寶玫" />
-          </Field>
-          <Field label="代表顏色">
-            <div className="flex gap-2 flex-wrap">
-              {CG_COLORS.map(c => (
-                <button key={c} onClick={() => set('color', c)}
-                  className="w-8 h-8 rounded-full border-4 transition"
-                  style={{ background: c, borderColor: form.color === c ? '#5C2828' : 'transparent' }} />
-              ))}
-            </div>
-          </Field>
+          {/* 基本資料 */}
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="姓名 *" cls="col-span-2 sm:col-span-1">
+              <input className={inputCls} style={inputSt} value={form.name}
+                onChange={e => set('name', e.target.value)} placeholder="例：魏寶玫" />
+            </Field>
+            <Field label="代表顏色" cls="col-span-2 sm:col-span-1">
+              <div className="flex gap-1.5 flex-wrap">
+                {CG_COLORS.map(c => (
+                  <button key={c} onClick={() => set('color', c)}
+                    className="w-7 h-7 rounded-full border-4 transition"
+                    style={{ background: c, borderColor: form.color === c ? '#5C2828' : 'transparent' }} />
+                ))}
+              </div>
+            </Field>
+          </div>
+
           {/* 預覽 */}
           <div className="flex items-center gap-3 p-3 rounded-xl border"
             style={{ background: '#FBF6EC', borderColor: '#E5D5B7' }}>
-            <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xl"
+            <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
               style={{ background: form.color }}>{form.name[0] ?? '？'}</div>
             <div>
-              <div className="font-display font-semibold" style={{ color: '#5C2828' }}>{form.name || '姓名預覽'}</div>
-              <div className="text-xs" style={{ color: '#8B6F47' }}>照服員</div>
+              <div className="font-display font-semibold text-sm" style={{ color: '#5C2828' }}>{form.name || '姓名預覽'}</div>
+              <div className="text-xs" style={{ color: '#8B6F47' }}>已選 {selectedIds.length} 位長者</div>
+            </div>
+          </div>
+
+          {/* 指定負責長者 */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-medium" style={{ color: '#8B6F47' }}>
+                指定負責長者（可多選，已選 {selectedIds.length} 位）
+              </label>
+              <button className="text-xs underline" style={{ color: '#A53838' }}
+                onClick={() => setSelectedIds([])}>全部取消</button>
+            </div>
+            {/* 搜尋 */}
+            <input
+              className="w-full px-3 py-1.5 rounded-lg border text-xs outline-none mb-2"
+              style={{ background: '#FBF6EC', borderColor: '#C4A87A', color: '#5C2828' }}
+              placeholder="搜尋姓名或編號…"
+              value={recSearch}
+              onChange={e => setRecSearch(e.target.value)}
+            />
+            {/* 長者清單 */}
+            <div className="rounded-xl border overflow-y-auto"
+              style={{ borderColor: '#E5D5B7', maxHeight: 220 }}>
+              {filteredRecs.map(r => {
+                const checked = selectedIds.includes(r.id)
+                const otherCg = !checked && r.primaryCaregiver && r.primaryCaregiver !== initial?.id
+                return (
+                  <label key={r.id}
+                    className="flex items-center gap-3 px-3 py-2.5 cursor-pointer border-b hover:bg-orange-50 transition"
+                    style={{ borderColor: '#EAE0CC' }}>
+                    <input type="checkbox" checked={checked}
+                      onChange={() => toggleRecipient(r.id)}
+                      className="rounded" style={{ accentColor: '#A53838' }} />
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium text-sm" style={{ color: '#5C2828' }}>{r.name}</span>
+                      <span className="text-xs ml-2 font-mono" style={{ color: '#A09684' }}>{r.code}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <span className="text-xs px-1.5 py-0.5 rounded-full"
+                        style={{ background: '#EAE0CC', color: '#5C3A1E' }}>CMS {r.cms}</span>
+                      {otherCg && (
+                        <span className="text-xs" style={{ color: '#C68B4F' }}>已分配他人</span>
+                      )}
+                    </div>
+                  </label>
+                )
+              })}
+              {filteredRecs.length === 0 && (
+                <div className="py-6 text-center text-xs" style={{ color: '#A09684' }}>沒有符合的長者</div>
+              )}
             </div>
           </div>
         </div>
+
         {err && (
           <div className="mt-3 flex items-center gap-2 text-sm px-3 py-2 rounded-lg"
             style={{ background: '#FBE8DC', color: '#A53838' }}>
@@ -550,8 +619,23 @@ export default function AdminView() {
       {editCaregiver !== null && (
         <CaregiverModal
           initial={editCaregiver.id ? editCaregiver : null}
-          onSave={async (c) => {
+          allRecipients={recipients}
+          onSave={async (c, selectedRecipientIds) => {
+            // 1. 儲存照服員基本資料
             await (editCaregiver.id ? updateCaregiver(c) : addCaregiver(c))
+            // 2. 更新長者的 primaryCaregiver 欄位
+            const cgId = c.id
+            for (const r of recipients) {
+              const wasAssigned = r.primaryCaregiver === cgId
+              const isSelected  = selectedRecipientIds.includes(r.id)
+              if (wasAssigned && !isSelected) {
+                // 從此照服員移除
+                await updateRecipient({ ...r, primaryCaregiver: null })
+              } else if (!wasAssigned && isSelected) {
+                // 指派給此照服員
+                await updateRecipient({ ...r, primaryCaregiver: cgId })
+              }
+            }
             setEditCaregiver(null)
           }}
           onClose={() => setEditCaregiver(null)}

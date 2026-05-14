@@ -175,7 +175,13 @@ function AppInner() {
           <AttendanceView attendance={attendance} setAttendance={setAttendance} onSelectRecipient={setSelectedRecipient} {...sharedProps} />
         )}
         {tab === 'stats' && (
-          <StatsView attendance={attendance} assignments={dailyAssignments[todayStr] ?? defaultAssignments()} onSelectRecipient={setSelectedRecipient} />
+          <StatsView
+            attendance={attendance}
+            assignments={dailyAssignments[todayStr] ?? defaultAssignments()}
+            monthlyAttendance={monthlyAttendance}
+            dailyAssignments={dailyAssignments}
+            onSelectRecipient={setSelectedRecipient}
+          />
         )}
         {tab === 'health' && (
           <HealthView
