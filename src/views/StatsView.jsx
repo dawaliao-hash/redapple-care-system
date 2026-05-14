@@ -99,23 +99,23 @@ export default function StatsView({ attendance, assignments, onSelectRecipient }
       })
     })
     return m
-  }, [days, attendance, assignments])
+  }, [days, attendance, assignments, CAREGIVERS, RECIPIENTS])   // ← 補上依賴
 
   const totals = useMemo(() => {
     const t = {}
     CAREGIVERS.forEach(cg => {
-      t[cg.id] = days.reduce((s, d) => s + (matrix[cg.id][d.label]?.count || 0), 0)
+      t[cg.id] = days.reduce((s, d) => s + (matrix[cg.id]?.[d.label]?.count || 0), 0)
     })
     return t
-  }, [matrix, days])
+  }, [matrix, days, CAREGIVERS])
 
   const dayTotals = useMemo(() => {
     const t = {}
     days.forEach(d => {
-      t[d.label] = CAREGIVERS.reduce((s, cg) => s + (matrix[cg.id][d.label]?.count || 0), 0)
+      t[d.label] = CAREGIVERS.reduce((s, cg) => s + (matrix[cg.id]?.[d.label]?.count || 0), 0)
     })
     return t
-  }, [matrix, days])
+  }, [matrix, days, CAREGIVERS])
 
   const grandTotal = Object.values(totals).reduce((a, b) => a + b, 0)
 
@@ -168,7 +168,7 @@ export default function StatsView({ attendance, assignments, onSelectRecipient }
                     </div>
                   </td>
                   {CAREGIVERS.map(cg => {
-                    const cell = matrix[cg.id][day.label]
+                    const cell = matrix[cg.id]?.[day.label] ?? { count: 0, recipients: [] }
                     return (
                       <td key={cg.id} className="px-3 py-2.5 border-b text-center" style={{ borderColor: '#EAE0CC' }}>
                         <button

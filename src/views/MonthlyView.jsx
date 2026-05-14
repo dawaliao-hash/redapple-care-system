@@ -79,7 +79,7 @@ export default function MonthlyView({ monthlyAttendance, setMonthlyAttendance, h
       }).length
     })
     return t
-  }, [monthlyAttendance, workDays])
+  }, [monthlyAttendance, workDays, RECIPIENTS])
 
   // 每日在場人數
   const dayTotals = useMemo(() => {
@@ -89,7 +89,7 @@ export default function MonthlyView({ monthlyAttendance, setMonthlyAttendance, h
       t[dk] = RECIPIENTS.filter(r => monthlyAttendance[dk]?.[r.id] === 'present').length
     })
     return t
-  }, [monthlyAttendance, workDays])
+  }, [monthlyAttendance, workDays, RECIPIENTS])
 
   const ROC = viewYear - 1911
 

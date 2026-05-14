@@ -16,14 +16,14 @@ export default function AttendanceView({ attendance, setAttendance, onSelectReci
       if (filterStatus !== 'all' && attendance[r.id] !== filterStatus) return false
       return true
     })
-  }, [attendance, filterStatus, search])
+  }, [attendance, filterStatus, search, RECIPIENTS])
 
   const statusCounts = useMemo(() => {
     const c = { all: RECIPIENTS.length }
     Object.keys(STATUS_TYPES).forEach(k => { c[k] = 0 })
     RECIPIENTS.forEach(r => { c[attendance[r.id]] = (c[attendance[r.id]] || 0) + 1 })
     return c
-  }, [attendance])
+  }, [attendance, RECIPIENTS])
 
   return (
     <div className="space-y-6">

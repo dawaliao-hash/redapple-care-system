@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { ChevronRight, Plus, AlertCircle, Activity, Heart, Droplets, Wind, FileText, X, Check } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { useData } from '../context/DataContext.jsx'
@@ -253,6 +253,13 @@ export default function HealthView({ healthRecords, setHealthRecords, addHealthR
   const { recipients: RECIPIENTS, caregivers: CAREGIVERS } = useData()
   const [pickedId, setPickedId]     = useState(RECIPIENTS[0]?.id ?? '')
   const [showModal, setShowModal]   = useState(false)
+
+  // RECIPIENTS 從 Supabase 載入後，確保 pickedId 有效
+  useEffect(() => {
+    if (pickedId === '' && RECIPIENTS.length > 0) {
+      setPickedId(RECIPIENTS[0].id)
+    }
+  }, [RECIPIENTS, pickedId])
 
   const recipient  = RECIPIENTS.find(r => r.id === pickedId)
   const records    = healthRecords[pickedId] || []
