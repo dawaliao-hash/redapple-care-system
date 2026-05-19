@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import { Eye, EyeOff, KeyRound, Mail, Check, User, Shield, Send } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Eye, EyeOff, KeyRound, Mail, User, Shield, Send, CheckCircle2, XCircle, Clock, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
+import { fetchPendingUsers, setUserApprovalStatus } from '../api/index.js'
 
 // ── 修改自己的密碼 ─────────────────────────────────────────
 function ChangePasswordSection({ user }) {
@@ -132,6 +133,95 @@ function SendResetSection() {
   )
 }
 
+// ── 帳號審核（管理員）──────────────────────────────────────
+function ApprovalSection() {
+  const [users,   setUsers]   = useState([])
+  const [loading, setLoading] = useState(true)
+  const [busy,    setBusy]    = useState({}) // userId → true while processing
+
+  const load = () => {
+    setLoading(true)
+    fetchPendingUsers().then(data => { setUsers(data); setLoading(false) })
+  }
+
+  useEffect(() => { load() }, [])
+
+  const handle = async (userId, status) => {
+    setBusy(b => ({ ...b, [userId]: true }))
+    try {
+      await setUserApprovalStatus(userId, status)
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, status } : u))
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setBusy(b => ({ ...b, [userId]: false }))
+    }
+  }
+
+  const inputSt = { background: '#FBF6EC', borderColor: '#C4A87A', color: '#5C2828' }
+
+  return (
+    <div className="rounded-2xl p-5 border" style={{ background: '#FBF6EC', borderColor: '#C4A87A' }}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Shield size={18} style={{ color: '#A53838' }}/>
+          <h3 className="font-display font-semibold" style={{ color: '#5C2828' }}>帳號審核</h3>
+        </div>
+        <button onClick={load} disabled={loading}
+          className="p-1.5 rounded-lg hover:bg-orange-100 transition" title="重新整理">
+          <RefreshCw size={15} style={{ color: '#8B6F47', animation: loading ? 'spin 1s linear infinite' : 'none' }}/>
+        </button>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-center py-4" style={{ color: '#A09684' }}>載入中⋯</p>
+      ) : users.length === 0 ? (
+        <p className="text-sm text-center py-4" style={{ color: '#A09684' }}>目前沒有待審核的帳號</p>
+      ) : (
+        <div className="space-y-2">
+          {users.map(u => (
+            <div key={u.id} className="flex items-center gap-3 p-3 rounded-xl"
+              style={{ background: '#FFFAF0', border: '1px solid #E5D5B7' }}>
+              {/* 狀態圖示 */}
+              <div className="flex-shrink-0">
+                {u.status === 'pending'  && <Clock      size={18} style={{ color: '#C68B4F' }}/>}
+                {u.status === 'approved' && <CheckCircle2 size={18} style={{ color: '#2E6E3E' }}/>}
+                {u.status === 'rejected' && <XCircle    size={18} style={{ color: '#A53838' }}/>}
+              </div>
+
+              {/* Email 與時間 */}
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate" style={{ color: '#5C2828' }}>{u.email}</div>
+                <div className="text-xs" style={{ color: '#A09684' }}>
+                  申請時間：{new Date(u.created_at).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </div>
+
+              {/* 操作按鈕 */}
+              <div className="flex gap-1.5 flex-shrink-0">
+                {u.status !== 'approved' && (
+                  <button onClick={() => handle(u.id, 'approved')} disabled={!!busy[u.id]}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold transition hover:shadow-sm"
+                    style={{ background: '#7A9474', color: 'white', opacity: busy[u.id] ? 0.5 : 1 }}>
+                    核准
+                  </button>
+                )}
+                {u.status !== 'rejected' && (
+                  <button onClick={() => handle(u.id, 'rejected')} disabled={!!busy[u.id]}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold transition hover:shadow-sm"
+                    style={{ background: '#F0D5D0', color: '#8B2C20', opacity: busy[u.id] ? 0.5 : 1 }}>
+                    拒絕
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── 主 AccountView ─────────────────────────────────────────
 export default function AccountView({ user }) {
   const userDisplay = user?.user_metadata?.display_name || user?.email?.split('@')[0] || '使用者'
@@ -186,36 +276,8 @@ export default function AccountView({ user }) {
         <SendResetSection/>
       </div>
 
-      {/* 新增帳號說明（管理員才看得到） */}
-      {isAdmin && (
-        <div className="rounded-2xl p-5 border" style={{ background: '#FBF6EC', borderColor: '#C4A87A' }}>
-          <div className="flex items-center gap-2 mb-3">
-            <Shield size={18} style={{ color: '#A53838' }}/>
-            <h3 className="font-display font-semibold" style={{ color: '#5C2828' }}>新增帳號（管理員操作）</h3>
-          </div>
-          <p className="text-sm mb-3" style={{ color: '#8B6F47' }}>
-            請至 Supabase Dashboard 新增使用者帳號：
-          </p>
-          <ol className="space-y-2 text-sm" style={{ color: '#5C2828' }}>
-            <li className="flex gap-2">
-              <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs text-white font-bold" style={{ background: '#A53838' }}>1</span>
-              前往 <strong>supabase.com/dashboard</strong> → 選擇此專案
-            </li>
-            <li className="flex gap-2">
-              <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs text-white font-bold" style={{ background: '#A53838' }}>2</span>
-              左側 <strong>Authentication → Users</strong> → 點右上角 <strong>「Add user」</strong>
-            </li>
-            <li className="flex gap-2">
-              <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs text-white font-bold" style={{ background: '#A53838' }}>3</span>
-              填入 Email 和密碼，勾選 <strong>「Auto Confirm User」</strong>
-            </li>
-            <li className="flex gap-2">
-              <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs text-white font-bold" style={{ background: '#A53838' }}>4</span>
-              新帳號即可立即使用此系統登入
-            </li>
-          </ol>
-        </div>
-      )}
+      {/* 帳號審核（管理員才看得到） */}
+      {isAdmin && <ApprovalSection />}
     </div>
   )
 }

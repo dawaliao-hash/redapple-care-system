@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Eye, EyeOff, LogIn, Mail, ArrowLeft, CheckCircle, KeyRound, UserPlus } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
+import { registerApprovalRequest } from '../api/index.js'
 
 const inputCls = 'w-full px-4 py-3 rounded-xl border text-sm outline-none transition'
 const inputSt  = { background: '#FBF6EC', borderColor: '#C4A87A', color: '#5C2828' }
@@ -123,13 +124,17 @@ function RegisterForm({ onBack }) {
     if (password.length < 8)    { setError('密碼至少需要 8 個字元'); return }
     if (password !== confirm)   { setError('兩次密碼不符'); return }
     setLoading(true); setError('')
-    const { error: authError } = await supabase.auth.signUp({ email, password })
+    const { data: signUpData, error: authError } = await supabase.auth.signUp({ email, password })
     if (authError) {
       setError(
         authError.message.includes('already registered') ? '此 Email 已有帳號，請直接登入'
         : `建立失敗：${authError.message}`
       )
     } else {
+      // 送出審核申請
+      if (signUpData?.user) {
+        await registerApprovalRequest(signUpData.user.id, email)
+      }
       setDone(true)
     }
     setLoading(false)
@@ -143,8 +148,10 @@ function RegisterForm({ onBack }) {
         </div>
         <div>
           <p className="font-display font-semibold text-lg" style={{ color: '#5C2828' }}>帳號建立成功！</p>
-          <p className="text-sm mt-2" style={{ color: '#8B6F47' }}>
-            帳號 <strong style={{ color: '#5C2828' }}>{email}</strong> 已建立，<br/>請返回登入頁使用新帳號登入。
+          <p className="text-sm mt-2 leading-relaxed" style={{ color: '#8B6F47' }}>
+            帳號申請已送出，<br/>
+            管理員審核通過後即可登入。<br/>
+            <span className="text-xs" style={{ color: '#A09684' }}>帳號：{email}</span>
           </p>
         </div>
         <button onClick={onBack}

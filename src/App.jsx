@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useAuth } from './hooks/useAuth.js'
 import { supabase } from './lib/supabase.js'
 import LoginPage from './pages/LoginPage.jsx'
+import PendingApprovalPage from './pages/PendingApprovalPage.jsx'
 import { DataProvider, useData } from './context/DataContext.jsx'
 import { generateHealthRecords } from './data/mockHealth.js'
 import { generateMonthlyAttendance, formatDisplayDate } from './data/monthlyAttendance.js'
@@ -12,6 +13,7 @@ import {
   fetchAttendanceForMonth, upsertAttendance,
   fetchAssignmentsForDate, upsertAssignment,
   fetchHealthRecords, insertHealthRecord,
+  checkApprovalStatus,
 } from './api/index.js'
 import Header from './components/Header.jsx'
 import TabNav from './components/TabNav.jsx'
@@ -255,10 +257,11 @@ function AppInner({ signOut, user }) {
 function AuthGate() {
   const { user, loading, signOut } = useAuth()
   const [isRecovery, setIsRecovery] = useState(
-    // 初始化時檢查 URL hash（Supabase 密碼重設連結使用 hash fragment）
     window.location.hash.includes('type=recovery') ||
     new URLSearchParams(window.location.search).get('type') === 'recovery'
   )
+  // null = 尚未檢查, 'admin'|'approved'|'pending'|'rejected'
+  const [approvalStatus, setApprovalStatus] = useState(null)
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
@@ -267,19 +270,25 @@ function AuthGate() {
     return () => subscription.unsubscribe()
   }, [])
 
-  // 密碼重設回呼頁
+  // 登入後檢查帳號審核狀態
+  useEffect(() => {
+    if (!user) { setApprovalStatus(null); return }
+    if (user.user_metadata?.role === 'admin') { setApprovalStatus('admin'); return }
+    checkApprovalStatus(user.id).then(setApprovalStatus)
+  }, [user])
+
   if (isRecovery) {
     return (
       <ResetPasswordPage onDone={() => {
         setIsRecovery(false)
-        // 清除 hash 並跳回首頁
         window.history.replaceState(null, '', '/')
         signOut()
       }} />
     )
   }
 
-  if (loading) {
+  const isCheckingAuth = loading || (!!user && approvalStatus === null)
+  if (isCheckingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#FBF6EC' }}>
         <div className="text-center space-y-3">
@@ -293,6 +302,10 @@ function AuthGate() {
   }
 
   if (!user) return <LoginPage />
+
+  if (approvalStatus === 'pending' || approvalStatus === 'rejected') {
+    return <PendingApprovalPage status={approvalStatus} user={user} signOut={signOut} />
+  }
 
   return (
     <DataProvider>

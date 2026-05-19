@@ -231,6 +231,42 @@ export async function upsertHealthRecordByDate(recipientId, record) {
   return hrFromRow(data)
 }
 
+// ════════════════════════════════════════════════════════════
+// USER APPROVALS
+// ════════════════════════════════════════════════════════════
+
+export async function checkApprovalStatus(userId) {
+  if (!isOnline) return 'approved'
+  const { data } = await supabase
+    .from('user_approvals').select('status').eq('id', userId).single()
+  return data?.status ?? 'approved'   // 找不到記錄 → 舊帳號，視為 approved
+}
+
+export async function registerApprovalRequest(userId, email) {
+  if (!isOnline) return
+  await supabase.from('user_approvals')
+    .upsert({ id: userId, email, status: 'pending' }, { onConflict: 'id' })
+}
+
+export async function fetchPendingUsers() {
+  if (!isOnline) return []
+  const { data, error } = await supabase
+    .from('user_approvals').select('*')
+    .in('status', ['pending', 'rejected'])
+    .order('created_at')
+  if (error) { console.error('[API] fetchPendingUsers:', error); return [] }
+  return data ?? []
+}
+
+export async function setUserApprovalStatus(userId, status) {
+  if (!isOnline) return
+  const { error } = await supabase.from('user_approvals').update({
+    status,
+    approved_at: status === 'approved' ? new Date().toISOString() : null,
+  }).eq('id', userId)
+  if (error) throw error
+}
+
 // 取得特定月份的健康紀錄
 export async function fetchHealthRecordsForMonth(recipientId, year, month) {
   if (!isOnline) return []
