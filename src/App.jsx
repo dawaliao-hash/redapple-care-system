@@ -1,4 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
+import { useAuth } from './hooks/useAuth.js'
+import LoginPage from './pages/LoginPage.jsx'
 import { DataProvider, useData } from './context/DataContext.jsx'
 import { generateHealthRecords } from './data/mockHealth.js'
 import { generateMonthlyAttendance, formatDisplayDate } from './data/monthlyAttendance.js'
@@ -23,7 +25,7 @@ import AdminView from './views/AdminView.jsx'
 const today    = new Date()
 const todayStr = formatDisplayDate(today)
 
-function AppInner() {
+function AppInner({ signOut, user }) {
   const { recipients, loading: dataLoading } = useData()
   const { holidays, syncing, lastSync }      = useHolidaySync()
 
@@ -160,7 +162,7 @@ function AppInner() {
 
   return (
     <div className="min-h-screen" style={{ background: '#FBF6EC', color: '#3D2817' }}>
-      <Header syncing={syncing} lastSync={lastSync} isOnline={isOnline} />
+      <Header syncing={syncing} lastSync={lastSync} isOnline={isOnline} user={user} signOut={signOut} />
       <TabNav tab={tab} setTab={setTab} />
       <main className="max-w-7xl mx-auto px-6 py-6">
         {tab === 'matching' && (
@@ -225,10 +227,31 @@ function AppInner() {
   )
 }
 
-export default function App() {
+function AuthGate() {
+  const { user, loading, signOut } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#FBF6EC' }}>
+        <div className="text-center space-y-3">
+          <svg viewBox="0 0 60 60" className="w-12 h-12 mx-auto animate-pulse">
+            <ellipse cx="32" cy="36" rx="18" ry="20" fill="#A53838" />
+          </svg>
+          <p className="text-sm" style={{ color: '#8B6F47' }}>正在驗證身份⋯</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) return <LoginPage />
+
   return (
     <DataProvider>
-      <AppInner />
+      <AppInner signOut={signOut} user={user} />
     </DataProvider>
   )
+}
+
+export default function App() {
+  return <AuthGate />
 }
