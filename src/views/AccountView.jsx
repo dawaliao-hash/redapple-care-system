@@ -14,7 +14,7 @@ function ChangePasswordSection({ user }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!cur)                     { setMsg({ type: 'err', text: '請輸入目前密碼' }); return }
-    if (next.length < 6)          { setMsg({ type: 'err', text: '新密碼至少 6 個字元' }); return }
+    if (next.length < 8)          { setMsg({ type: 'err', text: '新密碼至少 8 個字元' }); return }
     if (next !== confirm)         { setMsg({ type: 'err', text: '兩次新密碼不符' }); return }
     setLoading(true); setMsg(null)
 
@@ -87,7 +87,7 @@ function SendResetSection() {
     if (!email.trim()) { setMsg({ type: 'err', text: '請輸入 Email' }); return }
     setLoading(true); setMsg(null)
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${window.location.origin}/`,
     })
     if (error) {
       setMsg({ type: 'err', text: `發送失敗：${error.message}` })

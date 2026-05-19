@@ -8,7 +8,9 @@ if (!url || !key) {
 }
 
 export const supabase = url && key
-  ? createClient(url, key)
+  ? createClient(url, key, {
+      auth: { flowType: 'implicit' },
+    })
   : null
 
 export const isOnline = !!supabase
