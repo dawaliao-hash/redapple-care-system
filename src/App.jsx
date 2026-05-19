@@ -21,6 +21,8 @@ import StatsView from './views/StatsView.jsx'
 import AttendanceView from './views/AttendanceView.jsx'
 import HealthView from './views/HealthView.jsx'
 import AdminView from './views/AdminView.jsx'
+import AccountView from './views/AccountView.jsx'
+import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
 
 const today    = new Date()
 const todayStr = formatDisplayDate(today)
@@ -213,7 +215,8 @@ function AppInner({ signOut, user }) {
             onSelectRecipient={setSelectedRecipient}
           />
         )}
-        {tab === 'admin' && <AdminView />}
+        {tab === 'admin'   && <AdminView />}
+        {tab === 'account' && <AccountView user={user} />}
       </main>
       {selectedRecipient && (
         <RecipientModal
@@ -229,6 +232,12 @@ function AppInner({ signOut, user }) {
 
 function AuthGate() {
   const { user, loading, signOut } = useAuth()
+
+  // 密碼重設回呼頁（從 Email 連結點進來）
+  if (window.location.pathname === '/reset-password' ||
+      window.location.hash.includes('type=recovery')) {
+    return <ResetPasswordPage onDone={() => window.location.replace('/')} />
+  }
 
   if (loading) {
     return (

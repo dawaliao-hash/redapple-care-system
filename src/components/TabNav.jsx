@@ -1,4 +1,4 @@
-import { Users, ClipboardList, Activity, Heart, CalendarDays, Settings } from 'lucide-react'
+import { Users, ClipboardList, Activity, Heart, CalendarDays, Settings, UserCog } from 'lucide-react'
 
 const TABS = [
   { id: 'matching',   label: '配對總覽', icon: Users },
@@ -7,6 +7,7 @@ const TABS = [
   { id: 'stats',      label: '服務統計', icon: ClipboardList },
   { id: 'health',     label: '健康紀錄', icon: Heart },
   { id: 'admin',      label: '機構管理', icon: Settings },
+  { id: 'account',    label: '帳號設定', icon: UserCog },
 ]
 
 export default function TabNav({ tab, setTab }) {
