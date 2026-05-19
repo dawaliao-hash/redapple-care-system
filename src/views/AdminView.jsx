@@ -23,6 +23,16 @@ const labelSt  = { color: '#8B6F47', fontSize: 12, marginBottom: 4, display: 'bl
 // ════════════════════════════════════════════════════════
 // 長者表單 Modal
 // ════════════════════════════════════════════════════════
+// 民國年 ↔ 西元年轉換（民國元年 = 西元1912）
+const ROC_OFFSET = 1911
+function calcAgeFromBirth(y, m, d) {
+  if (!y || !m || !d) return null
+  const today = new Date()
+  let age = today.getFullYear() - y
+  if (today.getMonth() + 1 < m || (today.getMonth() + 1 === m && today.getDate() < d)) age--
+  return age >= 0 ? age : null
+}
+
 function RecipientModal({ initial, caregivers, onSave, onClose }) {
   const isNew = !initial?.id
   const [form, setForm] = useState(initial ?? {
@@ -33,6 +43,17 @@ function RecipientModal({ initial, caregivers, onSave, onClose }) {
   })
   const [condInput, setCondInput] = useState((initial?.conditions ?? []).join('、'))
   const [err, setErr] = useState('')
+
+  // 出生年月日（民國）— UI only，計算後寫入 form.age
+  const [bY, setBY] = useState('')  // 民國年
+  const [bM, setBM] = useState('')
+  const [bD, setBD] = useState('')
+
+  const computedAge = calcAgeFromBirth(
+    bY ? Number(bY) + ROC_OFFSET : null,
+    bM ? Number(bM) : null,
+    bD ? Number(bD) : null,
+  )
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -45,8 +66,17 @@ function RecipientModal({ initial, caregivers, onSave, onClose }) {
   const handleSave = () => {
     if (!form.name.trim()) { setErr('請填寫姓名'); return }
     if (!form.code.trim()) { setErr('請填寫個案編號'); return }
-    onSave({ ...form, conditions: condInput.split(/[、,，\s]+/).filter(Boolean), age: Number(form.age) })
+    const age = computedAge ?? (form.age !== '' ? Number(form.age) : 0)
+    onSave({ ...form, conditions: condInput.split(/[、,，\s]+/).filter(Boolean), age })
   }
+
+  // 民國年選項：民國20年(1931)到民國120年(2031)
+  const rocYears = Array.from({ length: 101 }, (_, i) => 20 + i)
+  const months   = Array.from({ length: 12 }, (_, i) => i + 1)
+  const days     = Array.from({ length: 31 }, (_, i) => i + 1)
+  const selSt    = { background: '#FBF6EC', borderColor: '#C4A87A', color: '#5C2828',
+                     borderWidth: 1, borderStyle: 'solid', borderRadius: 8,
+                     padding: '6px 8px', fontSize: 13, outline: 'none' }
 
   return (
     <Overlay onClose={onClose}>
@@ -73,9 +103,32 @@ function RecipientModal({ initial, caregivers, onSave, onClose }) {
               ))}
             </div>
           </Field>
-          <Field label="年齡">
-            <input type="number" className={inputCls} style={inputSt} value={form.age}
-              onChange={e => set('age', e.target.value)} placeholder="例：82" min={0} max={120} />
+          <Field label="出生年月日">
+            <div className="space-y-1.5">
+              <div className="flex gap-1.5 items-center">
+                <select value={bY} onChange={e => setBY(e.target.value)} style={selSt}>
+                  <option value="">民國年</option>
+                  {rocYears.map(y => <option key={y} value={y}>民國{y}年</option>)}
+                </select>
+                <select value={bM} onChange={e => setBM(e.target.value)} style={selSt}>
+                  <option value="">月</option>
+                  {months.map(m => <option key={m} value={m}>{m}月</option>)}
+                </select>
+                <select value={bD} onChange={e => setBD(e.target.value)} style={selSt}>
+                  <option value="">日</option>
+                  {days.map(d => <option key={d} value={d}>{d}日</option>)}
+                </select>
+              </div>
+              {computedAge !== null ? (
+                <div className="flex items-center gap-1.5 text-sm font-semibold"
+                  style={{ color: '#A53838' }}>
+                  <span>→</span>
+                  <span>年齡：{computedAge} 歲</span>
+                </div>
+              ) : form.age ? (
+                <div className="text-xs" style={{ color: '#8B6F47' }}>目前年齡：{form.age} 歲</div>
+              ) : null}
+            </div>
           </Field>
           <Field label="CMS 等級">
             <div className="flex gap-1 flex-wrap">
