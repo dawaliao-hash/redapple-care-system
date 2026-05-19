@@ -84,7 +84,8 @@ export async function fetchRecipients() {
   if (!isOnline) return DEFAULT_R
   const { data, error } = await supabase.from('recipients').select('*').order('id')
   if (error) { console.error('[API] fetchRecipients:', error); return DEFAULT_R }
-  return data.map(fromRow)
+  // 若 Supabase 表格尚未 seed，fallback 到 JS 預設資料
+  return data.length > 0 ? data.map(fromRow) : DEFAULT_R
 }
 
 export async function upsertRecipient(r) {
@@ -112,7 +113,7 @@ export async function fetchCaregivers() {
   if (!isOnline) return DEFAULT_C
   const { data, error } = await supabase.from('caregivers').select('*').order('id')
   if (error) { console.error('[API] fetchCaregivers:', error); return DEFAULT_C }
-  return data.map(cgFromRow)
+  return data.length > 0 ? data.map(cgFromRow) : DEFAULT_C
 }
 
 export async function upsertCaregiver(c) {
