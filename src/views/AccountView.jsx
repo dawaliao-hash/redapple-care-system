@@ -137,11 +137,14 @@ function SendResetSection() {
 function ApprovalSection() {
   const [users,   setUsers]   = useState([])
   const [loading, setLoading] = useState(true)
-  const [busy,    setBusy]    = useState({}) // userId → true while processing
+  const [dbReady, setDbReady] = useState(true)   // false = user_approvals 表格尚未建立
+  const [busy,    setBusy]    = useState({})
 
   const load = () => {
     setLoading(true)
-    fetchPendingUsers().then(data => { setUsers(data); setLoading(false) })
+    fetchPendingUsers()
+      .then(data => { setUsers(data); setDbReady(true); setLoading(false) })
+      .catch(() => { setDbReady(false); setLoading(false) })
   }
 
   useEffect(() => { load() }, [])
@@ -158,8 +161,6 @@ function ApprovalSection() {
     }
   }
 
-  const inputSt = { background: '#FBF6EC', borderColor: '#C4A87A', color: '#5C2828' }
-
   return (
     <div className="rounded-2xl p-5 border" style={{ background: '#FBF6EC', borderColor: '#C4A87A' }}>
       <div className="flex items-center justify-between mb-4">
@@ -173,11 +174,53 @@ function ApprovalSection() {
         </button>
       </div>
 
+      {/* 尚未執行 SQL 的提示 */}
+      {!dbReady && !loading && (
+        <div className="mb-4 p-3 rounded-xl text-sm space-y-2"
+          style={{ background: '#FBE8DC', border: '1px solid rgba(165,56,56,0.3)', color: '#5C2828' }}>
+          <p className="font-semibold">⚠ 審核資料表尚未建立</p>
+          <p style={{ color: '#8B6F47' }}>請至 <strong>Supabase Dashboard → SQL Editor</strong> 執行以下 SQL，完成後重新整理此頁：</p>
+          <pre className="text-xs rounded-lg p-2 overflow-x-auto"
+            style={{ background: '#5C2828', color: '#FBF1DD', lineHeight: 1.6 }}>
+{`-- 1. 建立審核資料表
+CREATE TABLE IF NOT EXISTS user_approvals (
+  id         uuid PRIMARY KEY
+             REFERENCES auth.users(id) ON DELETE CASCADE,
+  email      text NOT NULL,
+  status     text NOT NULL DEFAULT 'pending',
+  created_at timestamptz DEFAULT now(),
+  approved_at timestamptz
+);
+ALTER TABLE user_approvals ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "self_read" ON user_approvals
+  FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "admin_all" ON user_approvals
+  FOR ALL USING (
+    (auth.jwt()->'user_metadata'->>'role')='admin');
+CREATE POLICY "self_insert" ON user_approvals
+  FOR INSERT WITH CHECK (auth.uid() = id);
+
+-- 2. 設定管理員
+UPDATE auth.users
+SET raw_user_meta_data =
+  COALESCE(raw_user_meta_data,'{}'::jsonb)
+  || '{"role":"admin"}'::jsonb
+WHERE email = 'amuy.chen@gmail.com';
+
+-- 3. 已有帳號全部標為 approved
+INSERT INTO user_approvals (id, email, status, approved_at)
+SELECT id, email, 'approved', NOW()
+FROM auth.users
+ON CONFLICT (id) DO NOTHING;`}
+          </pre>
+        </div>
+      )}
+
       {loading ? (
         <p className="text-sm text-center py-4" style={{ color: '#A09684' }}>載入中⋯</p>
-      ) : users.length === 0 ? (
+      ) : dbReady && users.length === 0 ? (
         <p className="text-sm text-center py-4" style={{ color: '#A09684' }}>目前沒有待審核的帳號</p>
-      ) : (
+      ) : dbReady && (
         <div className="space-y-2">
           {users.map(u => (
             <div key={u.id} className="flex items-center gap-3 p-3 rounded-xl"
@@ -225,7 +268,9 @@ function ApprovalSection() {
 // ── 主 AccountView ─────────────────────────────────────────
 export default function AccountView({ user }) {
   const userDisplay = user?.user_metadata?.display_name || user?.email?.split('@')[0] || '使用者'
-  const isAdmin     = user?.user_metadata?.role === 'admin'
+  // 管理員判斷：已設定 role='admin' 的帳號，或在 SQL 執行前以 email 暫時辨識
+  const ADMIN_EMAILS = ['amuy.chen@gmail.com']
+  const isAdmin = user?.user_metadata?.role === 'admin' || ADMIN_EMAILS.includes(user?.email)
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">

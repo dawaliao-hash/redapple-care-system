@@ -254,7 +254,10 @@ export async function fetchPendingUsers() {
     .from('user_approvals').select('*')
     .in('status', ['pending', 'rejected'])
     .order('created_at')
-  if (error) { console.error('[API] fetchPendingUsers:', error); return [] }
+  if (error) {
+    console.error('[API] fetchPendingUsers:', error)
+    throw error   // 讓 ApprovalSection 的 .catch() 觸發，顯示 SQL 安裝提示
+  }
   return data ?? []
 }
 
