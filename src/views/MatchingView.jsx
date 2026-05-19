@@ -138,8 +138,11 @@ export default function MatchingView({
   // 當日出缺席
   const attendance = monthlyAttendance[dateStr] ?? {}
 
-  // 當日照服員配對（若無記錄，使用主責預設值）
-  const assignments = dailyAssignments[dateStr] ?? defaultAssignments()
+  // 當日照服員配對（若無記錄或為空物件，使用主責預設值）
+  const rawAsgn = dailyAssignments[dateStr]
+  const assignments = (rawAsgn && Object.keys(rawAsgn).length > 0)
+    ? rawAsgn
+    : defaultAssignments()
 
   const setAssignments = useCallback((updater) => {
     setDailyAssignments(prev => {

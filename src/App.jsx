@@ -93,10 +93,21 @@ function AppInner({ signOut, user }) {
     () => ({ [todayStr]: defaultAssignments() })
   )
 
+  // 若今天的配對是空的（localStorage 被舊版本清空），自動用 primaryCaregiver 填入
+  useEffect(() => {
+    const todayAsgn = dailyAssignments[todayStr]
+    if (!todayAsgn || Object.keys(todayAsgn).length === 0) {
+      const defaults = defaultAssignments()
+      if (Object.keys(defaults).length > 0) {
+        setDailyAssignmentsLocal(prev => ({ ...prev, [todayStr]: defaults }))
+      }
+    }
+  }, [recipients]) // 長者資料載入完成後執行
+
   useEffect(() => {
     if (!isOnline) return
     fetchAssignmentsForDate(todayStr).then(remote => {
-      if (remote) {
+      if (remote && Object.keys(remote).length > 0) {
         setDailyAssignmentsLocal(prev => ({ ...prev, [todayStr]: remote }))
       }
     })
