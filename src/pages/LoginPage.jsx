@@ -1,6 +1,9 @@
 import { useState } from 'react'
-import { Eye, EyeOff, LogIn, Mail, ArrowLeft, CheckCircle } from 'lucide-react'
+import { Eye, EyeOff, LogIn, Mail, ArrowLeft, CheckCircle, KeyRound } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
+
+const inputCls = 'w-full px-4 py-3 rounded-xl border text-sm outline-none transition'
+const inputSt  = { background: '#FBF6EC', borderColor: '#C4A87A', color: '#5C2828' }
 
 // ── 登入表單 ─────────────────────────────────────────────
 function SignInForm({ onForgot }) {
@@ -34,8 +37,20 @@ function SignInForm({ onForgot }) {
           onChange={e => { setEmail(e.target.value); setError('') }}
           autoComplete="email" autoFocus />
       </div>
+
       <div>
-        <label className="block text-xs font-medium mb-1.5" style={{ color: '#8B6F47' }}>密碼</label>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-xs font-medium" style={{ color: '#8B6F47' }}>密碼</label>
+          {/* 「忘記密碼」放在密碼欄標籤旁邊，最明顯的位置 */}
+          <button
+            type="button"
+            onClick={onForgot}
+            className="text-xs font-medium transition hover:opacity-75"
+            style={{ color: '#A53838', textDecoration: 'underline', textUnderlineOffset: '2px' }}
+          >
+            忘記密碼？
+          </button>
+        </div>
         <div className="relative">
           <input type={showPwd ? 'text' : 'password'} className={inputCls}
             style={{ ...inputSt, paddingRight: '3rem' }}
@@ -49,22 +64,44 @@ function SignInForm({ onForgot }) {
           </button>
         </div>
       </div>
+
       {error && (
-        <div className="px-4 py-3 rounded-xl text-sm"
+        <div className="px-4 py-3 rounded-xl text-sm flex items-start gap-2"
           style={{ background: '#FBE8DC', color: '#A53838', border: '1px solid rgba(165,56,56,0.3)' }}>
-          {error}
+          <span className="flex-shrink-0 mt-0.5">⚠</span>
+          <span>{error}</span>
         </div>
       )}
+
       <button type="submit" disabled={loading}
         className="w-full py-3.5 rounded-xl font-display font-semibold text-base flex items-center justify-center gap-2 transition hover:shadow-lg active:scale-[0.98]"
         style={{ background: loading ? '#D9C9A8' : '#A53838', color: loading ? '#8B6F47' : 'white',
                  cursor: loading ? 'not-allowed' : 'pointer', marginTop: '8px' }}>
-        {loading ? <><span className="animate-spin">⋯</span> 登入中</> : <><LogIn size={18}/> 登入系統</>}
+        {loading
+          ? <><span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>◌</span> 登入中⋯</>
+          : <><LogIn size={18}/> 登入系統</>
+        }
       </button>
-      <button type="button" onClick={onForgot}
-        className="w-full text-sm text-center transition hover:underline"
-        style={{ color: '#8B6F47' }}>
-        忘記密碼？
+
+      {/* 分隔線 */}
+      <div className="flex items-center gap-3 py-1">
+        <div className="flex-1 h-px" style={{ background: '#E5D5B7' }}></div>
+        <span className="text-xs" style={{ color: '#B5A285' }}>或</span>
+        <div className="flex-1 h-px" style={{ background: '#E5D5B7' }}></div>
+      </div>
+
+      {/* 忘記密碼 — 第二個按鈕，更明顯 */}
+      <button
+        type="button"
+        onClick={onForgot}
+        className="w-full py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition hover:shadow-sm"
+        style={{
+          background: '#FBF6EC',
+          color:      '#A53838',
+          border:     '1.5px solid #C4A87A',
+        }}
+      >
+        <KeyRound size={15}/> 忘記密碼 · 重設密碼
       </button>
     </form>
   )
@@ -81,9 +118,11 @@ function ForgotForm({ onBack }) {
     e.preventDefault()
     if (!email.trim()) { setError('請輸入電子郵件'); return }
     setLoading(true); setError('')
+
     const { error: authError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${window.location.origin}/`,
     })
+
     if (authError) {
       setError(`發送失敗：${authError.message}`)
     } else {
@@ -94,17 +133,24 @@ function ForgotForm({ onBack }) {
 
   if (sent) {
     return (
-      <div className="px-8 pb-8 text-center space-y-4">
-        <CheckCircle size={48} className="mx-auto" style={{ color: '#7A9474' }}/>
-        <p className="font-display font-semibold" style={{ color: '#5C2828' }}>重設信已寄出</p>
-        <p className="text-sm" style={{ color: '#8B6F47' }}>
-          請至 <strong>{email}</strong> 信箱收取密碼重設連結。<br/>
-          連結有效期限為 1 小時。
-        </p>
+      <div className="px-8 pb-10 text-center space-y-5">
+        <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto"
+          style={{ background: '#DFF0E0' }}>
+          <CheckCircle size={32} style={{ color: '#2E6E3E' }}/>
+        </div>
+        <div>
+          <p className="font-display font-semibold text-lg" style={{ color: '#5C2828' }}>重設信已寄出！</p>
+          <p className="text-sm mt-2 leading-relaxed" style={{ color: '#8B6F47' }}>
+            已將密碼重設連結寄至<br/>
+            <strong style={{ color: '#5C2828' }}>{email}</strong><br/>
+            請至信箱點擊連結以設定新密碼。
+          </p>
+          <p className="text-xs mt-2" style={{ color: '#A09684' }}>連結有效期限為 1 小時</p>
+        </div>
         <button onClick={onBack}
-          className="w-full py-3 rounded-xl font-medium flex items-center justify-center gap-2 border transition hover:bg-orange-50"
+          className="w-full py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 border transition hover:bg-orange-50"
           style={{ borderColor: '#C4A87A', color: '#5C2828' }}>
-          <ArrowLeft size={16}/> 返回登入
+          <ArrowLeft size={15}/> 返回登入
         </button>
       </div>
     )
@@ -112,47 +158,50 @@ function ForgotForm({ onBack }) {
 
   return (
     <form onSubmit={handleReset} className="px-8 pb-8 space-y-4">
-      <p className="text-sm" style={{ color: '#8B6F47' }}>
-        輸入帳號 Email，系統將寄送密碼重設連結至該信箱。
-      </p>
+      <div className="p-4 rounded-xl text-sm leading-relaxed"
+        style={{ background: '#FBF1DD', border: '1px solid #E5D5B7', color: '#8B6F47' }}>
+        <p className="font-medium mb-1" style={{ color: '#5C2828' }}>忘記密碼？</p>
+        輸入您的帳號 Email，系統將寄送一封<strong style={{ color: '#A53838' }}>密碼重設連結</strong>至該信箱。
+        點擊連結後即可設定新密碼。
+      </div>
+
       <div>
         <label className="block text-xs font-medium mb-1.5" style={{ color: '#8B6F47' }}>帳號 Email</label>
         <div className="relative">
-          <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#A09684' }}/>
+          <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#A09684' }}/>
           <input type="email" className={inputCls} style={{ ...inputSt, paddingLeft: '2.5rem' }}
-            placeholder="請輸入電子郵件" value={email}
+            placeholder="請輸入您的帳號 Email" value={email}
             onChange={e => { setEmail(e.target.value); setError('') }}
             autoFocus />
         </div>
       </div>
+
       {error && (
         <div className="px-4 py-3 rounded-xl text-sm"
           style={{ background: '#FBE8DC', color: '#A53838', border: '1px solid rgba(165,56,56,0.3)' }}>
           {error}
         </div>
       )}
+
       <button type="submit" disabled={loading}
         className="w-full py-3.5 rounded-xl font-display font-semibold flex items-center justify-center gap-2 transition hover:shadow-lg"
         style={{ background: loading ? '#D9C9A8' : '#A53838', color: loading ? '#8B6F47' : 'white',
                  cursor: loading ? 'not-allowed' : 'pointer' }}>
-        {loading ? '寄送中⋯' : <><Mail size={16}/> 寄送重設連結</>}
+        {loading ? '寄送中⋯' : <><Mail size={16}/> 寄送密碼重設連結</>}
       </button>
+
       <button type="button" onClick={onBack}
-        className="w-full text-sm text-center flex items-center justify-center gap-1 transition hover:underline"
-        style={{ color: '#8B6F47' }}>
-        <ArrowLeft size={13}/> 返回登入
+        className="w-full py-3 rounded-xl text-sm flex items-center justify-center gap-2 border transition hover:bg-orange-50"
+        style={{ borderColor: '#E5D5B7', color: '#8B6F47' }}>
+        <ArrowLeft size={14}/> 返回登入
       </button>
     </form>
   )
 }
 
-// ── 共用樣式 ──────────────────────────────────────────────
-const inputCls = 'w-full px-4 py-3 rounded-xl border text-sm outline-none transition focus:border-cranberry'
-const inputSt  = { background: '#FBF6EC', borderColor: '#C4A87A', color: '#5C2828' }
-
 // ── 主元件 ────────────────────────────────────────────────
 export default function LoginPage() {
-  const [mode, setMode] = useState('login') // 'login' | 'forgot'
+  const [mode, setMode] = useState('login')
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4"
@@ -169,8 +218,7 @@ export default function LoginPage() {
           <div className="px-8 pt-10 pb-6 text-center"
             style={{ background: 'linear-gradient(180deg, #FBF1DD 0%, #FFFAF0 100%)' }}>
             <div className="flex justify-center mb-4">
-              <svg viewBox="0 0 60 60" style={{ width: 64, height: 64 }}
-                filter="drop-shadow(0 8px 16px rgba(165,56,56,0.25))">
+              <svg viewBox="0 0 60 60" style={{ width: 64, height: 64, filter: 'drop-shadow(0 8px 16px rgba(165,56,56,0.25))' }}>
                 <path d="M30 12 C 28 8, 24 6, 22 9" stroke="#7A9474" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
                 <ellipse cx="32" cy="36" rx="18" ry="20" fill="#A53838"/>
                 <ellipse cx="26" cy="28" rx="6" ry="8" fill="#C85A5A" opacity="0.6"/>
@@ -190,6 +238,7 @@ export default function LoginPage() {
             : <ForgotForm onBack={() => setMode('login')} />
           }
         </div>
+
         <p className="text-center text-xs mt-5" style={{ color: '#B5A285' }}>
           雲林縣家園關懷協會附設雲林縣私立紅蘋果社區式服務類長期照顧服務機構
         </p>
