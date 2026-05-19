@@ -17,9 +17,13 @@ export function DataProvider({ children }) {
   const [localR, setLocalR] = useLocalStorage('redapple_recipients', INIT_R)
   const [localC, setLocalC] = useLocalStorage('redapple_caregivers', INIT_C)
 
+  // 若 localStorage 被舊版本寫入空陣列，直接改用 JS 預設資料
+  const safeR = Array.isArray(localR) && localR.length > 0 ? localR : INIT_R
+  const safeC = Array.isArray(localC) && localC.length > 0 ? localC : INIT_C
+
   // ── 線上資料（Supabase）───────────────────────────────────
-  const [recipients, setRecipients] = useState(localR)
-  const [caregivers, setCaregivers] = useState(localC)
+  const [recipients, setRecipients] = useState(safeR)
+  const [caregivers, setCaregivers] = useState(safeC)
 
   useEffect(() => {
     if (!isOnline) { setLoading(false); return }
