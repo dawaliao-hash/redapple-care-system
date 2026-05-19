@@ -177,11 +177,17 @@ export default function MatchingView({
   }
 
   // ── 資料計算 ────────────────────────────────────────
+  // 明確缺席的狀態：這些才從配對欄移除
+  const ABSENT_STATUSES = new Set(['rest','hospital','clinic','blood','absent','holiday'])
+
+  // 未設定出缺席 → 預設出席；只有明確標記缺席才不顯示
+  const isOnSite = (status) => !status || !ABSENT_STATUSES.has(status)
+
   const counts = useMemo(() => {
     const map = {}
     caregivers.forEach(c => { map[c.id] = [] })
     recipients.forEach(r => {
-      if (['present','respite'].includes(attendance[r.id])) {
+      if (isOnSite(attendance[r.id])) {
         const cgId = assignments[r.id]
         if (cgId && map[cgId]) map[cgId].push(r)
       }
@@ -190,7 +196,7 @@ export default function MatchingView({
   }, [attendance, assignments, recipients, caregivers])
 
   const totalActive = useMemo(() =>
-    recipients.filter(r => ['present','respite'].includes(attendance[r.id])).length,
+    recipients.filter(r => isOnSite(attendance[r.id])).length,
     [attendance, recipients]
   )
 
