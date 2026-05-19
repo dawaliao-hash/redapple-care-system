@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useAuth } from './hooks/useAuth.js'
 import { supabase } from './lib/supabase.js'
 import LoginPage from './pages/LoginPage.jsx'
@@ -93,16 +93,26 @@ function AppInner({ signOut, user }) {
     () => ({ [todayStr]: defaultAssignments() })
   )
 
-  // 若今天的配對是空的（localStorage 被舊版本清空），自動用 primaryCaregiver 填入
-  useEffect(() => {
+  // 同步計算「有效配對」：若 localStorage 今天是空的，直接 fallback 到 primaryCaregiver
+  // 用 useMemo 而非 useEffect，避免 stale closure + 同 reference 不觸發的問題
+  const effectiveDailyAssignments = useMemo(() => {
     const todayAsgn = dailyAssignments[todayStr]
-    if (!todayAsgn || Object.keys(todayAsgn).length === 0) {
+    if (todayAsgn && Object.keys(todayAsgn).length > 0) return dailyAssignments
+    const defaults = defaultAssignments()
+    if (!Object.keys(defaults).length) return dailyAssignments
+    return { ...dailyAssignments, [todayStr]: defaults }
+  }, [dailyAssignments, defaultAssignments])
+
+  // 若今天是空的，把預設值寫回 localStorage（方便下次直接讀到）
+  useEffect(() => {
+    setDailyAssignmentsLocal(prev => {
+      const todayAsgn = prev[todayStr]
+      if (todayAsgn && Object.keys(todayAsgn).length > 0) return prev
       const defaults = defaultAssignments()
-      if (Object.keys(defaults).length > 0) {
-        setDailyAssignmentsLocal(prev => ({ ...prev, [todayStr]: defaults }))
-      }
-    }
-  }, [recipients]) // 長者資料載入完成後執行
+      if (!Object.keys(defaults).length) return prev
+      return { ...prev, [todayStr]: defaults }
+    })
+  }, [defaultAssignments])
 
   useEffect(() => {
     if (!isOnline) return
@@ -183,7 +193,7 @@ function AppInner({ signOut, user }) {
           <MatchingView
             monthlyAttendance={monthlyAttendance}
             setMonthlyAttendance={setMonthlyAttendance}
-            dailyAssignments={dailyAssignments}
+            dailyAssignments={effectiveDailyAssignments}
             setDailyAssignments={setDailyAssignments}
             defaultAssignments={defaultAssignments}
             recipientOrder={recipientOrder}
@@ -213,9 +223,9 @@ function AppInner({ signOut, user }) {
         {tab === 'stats' && (
           <StatsView
             attendance={attendance}
-            assignments={dailyAssignments[todayStr] ?? defaultAssignments()}
+            assignments={effectiveDailyAssignments[todayStr] ?? defaultAssignments()}
             monthlyAttendance={monthlyAttendance}
-            dailyAssignments={dailyAssignments}
+            dailyAssignments={effectiveDailyAssignments}
             onSelectRecipient={setSelectedRecipient}
           />
         )}
