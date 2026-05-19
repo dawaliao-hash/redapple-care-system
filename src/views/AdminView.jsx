@@ -8,7 +8,11 @@ const CG_COLORS = ['#B8543A','#7A9474','#C68B4F','#8E6BA8','#5B7B8C',
                    '#4A7FA5','#A0522D','#6B8E6B','#B8860B','#8B4789']
 
 const BATH_OPTIONS = ['一','二','三','四','五']
-const LEVEL_OPTIONS = ['一般戶','中低戶','低收戶']
+const LEVEL_OPTIONS = [
+  { value: '第一類', label: '第一類', desc: '低收入戶' },
+  { value: '第二類', label: '第二類', desc: '中低收入戶' },
+  { value: '第三類', label: '第三類', desc: '一般戶' },
+]
 const CMS_OPTIONS   = [1,2,3,4,5,6,7,8]
 
 // ── 共用 style ────────────────────────────────────────
@@ -25,7 +29,7 @@ function RecipientModal({ initial, caregivers, onSave, onClose }) {
     id: `r${Date.now()}`, code: '', name: '', gender: '女', age: '',
     cms: 5, primaryCaregiver: caregivers[0]?.id ?? '',
     conditions: [], emergencyContact: '', phone: '', address: '',
-    bathDays: [], notes: '', level: '一般戶',
+    bathDays: [], notes: '', level: '第三類',
   })
   const [condInput, setCondInput] = useState((initial?.conditions ?? []).join('、'))
   const [err, setErr] = useState('')
@@ -88,13 +92,14 @@ function RecipientModal({ initial, caregivers, onSave, onClose }) {
           </Field>
           <Field label="身分別">
             <div className="flex gap-2 flex-wrap">
-              {LEVEL_OPTIONS.map(l => (
-                <button key={l} onClick={() => set('level', l)}
-                  className="px-3 py-1.5 rounded-lg text-sm font-medium border transition"
-                  style={{ background: form.level === l ? '#C68B4F' : '#FBF6EC',
-                           color: form.level === l ? 'white' : '#5C3A1E',
-                           borderColor: '#C4A87A' }}>
-                  {l}
+              {LEVEL_OPTIONS.map(({ value, label, desc }) => (
+                <button key={value} onClick={() => set('level', value)}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium border transition flex flex-col items-center leading-tight"
+                  style={{ background: form.level === value ? '#C68B4F' : '#FBF6EC',
+                           color: form.level === value ? 'white' : '#5C3A1E',
+                           borderColor: '#C4A87A', minWidth: 72 }}>
+                  <span>{label}</span>
+                  <span style={{ fontSize: 10, opacity: 0.8 }}>{desc}</span>
                 </button>
               ))}
             </div>
