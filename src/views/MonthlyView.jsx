@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, GripVertical } from 'lucide-react'
+import { ChevronLeft, ChevronRight, GripVertical, CheckCheck } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { STATUS_TYPES } from '../data/statusTypes.js'
 import { formatDisplayDate } from '../data/monthlyAttendance.js'
@@ -34,10 +34,11 @@ function getDaysInMonth(year, month) {
 
 export default function MonthlyView({
   monthlyAttendance, setMonthlyAttendance,
-  recipientOrder = [], setRecipientOrder,  // 共用排序
+  recipientOrder = [], setRecipientOrder,
   holidays = {},
 }) {
   const { recipients: RECIPIENTS } = useData()
+  const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d }, [])
 
   // 依共用 recipientOrder 排列（新增長者接在最後）
   const SORTED_RECIPIENTS = useMemo(() => {
@@ -90,7 +91,6 @@ export default function MonthlyView({
     setDragId(null); setDragOverId(null)
   }, [dragId, dragAbove, SORTED_RECIPIENTS, setRecipientOrder])
 
-  const today = new Date()
   const [viewYear, setViewYear]   = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth() + 1)
 
@@ -125,27 +125,54 @@ export default function MonthlyView({
     }))
   }
 
+  // 判斷「實際出席」：未設定 + 過去/今天 + 非假日 → 視同出席（與今日點名一致）
+  const isActuallyPresent = useCallback((date, recipientId) => {
+    const status = monthlyAttendance[date]?.[recipientId]
+    const holi   = holidays[date]
+    const d      = new Date(date.replace(/\//g, '-'))
+    d.setHours(0, 0, 0, 0)
+    const isFuture = d > today
+    return status === 'present' || (!status && !holi && !isFuture)
+  }, [monthlyAttendance, holidays, today])
+
   // 每位長者本月出席天數
   const recipientTotals = useMemo(() => {
     const t = {}
     RECIPIENTS.forEach(r => {
-      t[r.id] = workDays.filter(d => {
-        const dk = formatDisplayDate(d)
-        return monthlyAttendance[dk]?.[r.id] === 'present'
-      }).length
+      t[r.id] = workDays.filter(d => isActuallyPresent(formatDisplayDate(d), r.id)).length
     })
     return t
-  }, [monthlyAttendance, workDays, RECIPIENTS])
+  }, [monthlyAttendance, workDays, RECIPIENTS, isActuallyPresent])
 
   // 每日在場人數
   const dayTotals = useMemo(() => {
     const t = {}
     workDays.forEach(d => {
       const dk = formatDisplayDate(d)
-      t[dk] = RECIPIENTS.filter(r => monthlyAttendance[dk]?.[r.id] === 'present').length
+      t[dk] = RECIPIENTS.filter(r => isActuallyPresent(dk, r.id)).length
     })
     return t
-  }, [monthlyAttendance, workDays, RECIPIENTS])
+  }, [monthlyAttendance, workDays, RECIPIENTS, isActuallyPresent])
+
+  // 一鍵全員出席：將本月所有未設定的過去/今天工作日設為 present
+  const markAllPresent = useCallback(() => {
+    setMonthlyAttendance(prev => {
+      const next = { ...prev }
+      workDays.forEach(d => {
+        if (d > today) return
+        const dk   = formatDisplayDate(d)
+        const holi = holidays[dk]
+        if (holi) return
+        const dayData = { ...(prev[dk] ?? {}) }
+        let changed = false
+        RECIPIENTS.forEach(r => {
+          if (!dayData[r.id]) { dayData[r.id] = 'present'; changed = true }
+        })
+        if (changed) next[dk] = dayData
+      })
+      return next
+    })
+  }, [workDays, today, holidays, RECIPIENTS, setMonthlyAttendance])
 
   const ROC = viewYear - 1911
 
@@ -197,8 +224,13 @@ export default function MonthlyView({
           ))}
         </div>
         <p className="text-xs w-full" style={{ color: '#8B6F47' }}>
-          點擊格子切換狀態 · 假日預設「假」，可手動調整為其他狀態 · 橫向滑動查看全月
-        </p>
+          點擊格子切換狀態 · 假日預設「假」，可手動調整為其他狀態 · 橫向滑動查看全月</p>
+        <button onClick={markAllPresent}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition hover:shadow-md"
+          style={{ background: '#7A9474', color: 'white', flexShrink: 0 }}
+          title="將本月所有未設定的工作日標記為出席（不覆蓋已設定的狀態）">
+          <CheckCheck size={16}/> 一鍵全員出席
+        </button>
       </div>
 
       {/* ── 月度表格 ── */}
@@ -276,30 +308,34 @@ export default function MonthlyView({
                     </td>
                     {/* 每日格子 */}
                     {workDays.map(d => {
-                      const dk         = formatDisplayDate(d)
-                      const holi       = holidays[dk]
-                      const isToday    = dk === todayStr
-                      const isFuture   = d > today && dk !== todayStr
-                      // 假日預設 'holiday'，否則看 monthlyAttendance
-                      const storedKey  = monthlyAttendance[dk]?.[r.id]
-                      const sKey       = storedKey ?? (holi ? 'holiday' : '')
-                      const s          = sKey ? SHORT[sKey] : null
+                      const dk        = formatDisplayDate(d)
+                      const holi      = holidays[dk]
+                      const isToday   = dk === todayStr
+                      const isFuture  = d > today && dk !== todayStr
+                      const storedKey = monthlyAttendance[dk]?.[r.id]
+                      // 過去/今天未設定 → 視同出席（與今日點名邏輯一致）
+                      const sKey      = storedKey ?? (holi ? 'holiday' : (!isFuture ? 'present' : ''))
+                      // 未明確設定的「出席」用淡色，已明確設定的用正常色
+                      const isDefaultPresent = !storedKey && sKey === 'present'
+                      const s = sKey ? {
+                        ...SHORT[sKey],
+                        ...(isDefaultPresent ? { bg: '#EFF8F0', text: '#7AAF7A' } : {}),
+                      } : null
 
-                      // 所有格子（含未來日期）→ 可點擊切換
-                      // 未來且已設定狀態 → 虛線框提示「預先設定」
                       const isPreset = isFuture && !!sKey && sKey !== 'holiday'
                       return (
                         <td key={dk} style={tdBase}>
                           <button
                             onClick={() => toggleStatus(r.id, d)}
                             title={
-                              sKey
+                              isDefaultPresent ? '未明確設定（視同出席，點擊可更改）'
+                              : sKey
                                 ? (STATUS_TYPES[sKey]?.label + (holi ? `（${holi}）` : '') + (isPreset ? '（預設）' : ''))
-                                : (isFuture ? '點擊預先設定狀態' : '點擊設定狀態')
+                                : '點擊預先設定狀態'
                             }
                             style={cellStyle({
-                              bg:     s ? s.bg : (isToday ? '#FBF0E8' : isFuture ? '#F5F1EA' : '#FAFAF5'),
-                              color:  s ? s.text : (isFuture ? '#C4A87A' : '#C4A87A'),
+                              bg:     s ? s.bg : '#F5F1EA',
+                              color:  s ? s.text : '#C4A87A',
                               border: isToday   ? '1.5px solid #A53838'
                                     : isPreset  ? '1.5px dashed #A53838'
                                     : isFuture  ? '1px dashed #C4A87A'
