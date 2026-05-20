@@ -20,6 +20,7 @@ import TabNav from './components/TabNav.jsx'
 import RecipientModal from './components/RecipientModal.jsx'
 import MatchingView from './views/MatchingView.jsx'
 import MonthlyView from './views/MonthlyView.jsx'
+import StaffingView from './views/StaffingView.jsx'
 import StatsView from './views/StatsView.jsx'
 import AttendanceView from './views/AttendanceView.jsx'
 import HealthView from './views/HealthView.jsx'
@@ -254,6 +255,15 @@ function AppInner({ signOut, user }) {
           <MonthlyView
             monthlyAttendance={monthlyAttendance}
             setMonthlyAttendance={setMonthlyAttendance}
+            recipientOrder={recipientOrder}
+            setRecipientOrder={setRecipientOrder}
+            {...sharedProps}
+          />
+        )}
+        {tab === 'staffing' && (
+          <StaffingView
+            monthlyAttendance={monthlyAttendance}
+            dailyAssignments={effectiveDailyAssignments}
             recipientOrder={recipientOrder}
             setRecipientOrder={setRecipientOrder}
             {...sharedProps}
