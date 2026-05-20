@@ -53,14 +53,22 @@ function AppInner({ signOut, user }) {
     'redapple_monthly_attendance', generateMonthlyAttendance
   )
 
+  // 深層合併出缺席：保留本地未同步的欄位，同時套用遠端更新
+  const mergeAttendance = useCallback((remote) => {
+    if (!Object.keys(remote).length) return
+    setMonthlyAttendanceLocal(prev => {
+      const merged = { ...prev }
+      Object.entries(remote).forEach(([date, dayData]) => {
+        merged[date] = { ...(prev[date] ?? {}), ...dayData }
+      })
+      return merged
+    })
+  }, [])
+
   // Supabase 啟動時同步本月資料
   useEffect(() => {
     if (!isOnline) return
-    fetchAttendanceForMonth(today.getFullYear(), today.getMonth() + 1).then(remote => {
-      if (Object.keys(remote).length > 0) {
-        setMonthlyAttendanceLocal(prev => ({ ...prev, ...remote }))
-      }
-    })
+    fetchAttendanceForMonth(today.getFullYear(), today.getMonth() + 1).then(mergeAttendance)
   }, [])
 
   // 寫入出缺席 → 同時更新 local 和 Supabase
@@ -125,6 +133,45 @@ function AppInner({ signOut, user }) {
     })
   }, [])
 
+  // ── 多用戶即時同步 ────────────────────────────────────────────
+  // 節流：同一秒內的多次觸發只執行一次
+  const lastSyncMs = useRef(0)
+  const refetchFromSupabase = useCallback(() => {
+    const now = Date.now()
+    if (now - lastSyncMs.current < 3000) return   // 3秒內不重複
+    lastSyncMs.current = now
+    fetchAttendanceForMonth(today.getFullYear(), today.getMonth() + 1).then(mergeAttendance)
+    fetchAssignmentsForDate(todayStr).then(remote => {
+      if (remote && Object.keys(remote).length > 0) {
+        setDailyAssignmentsLocal(prev => ({ ...prev, [todayStr]: remote }))
+      }
+    })
+  }, [mergeAttendance])
+
+  useEffect(() => {
+    if (!isOnline) return
+
+    // Supabase Realtime：任何用戶改了出缺席或配對，立即通知此裝置重抓
+    const channel = supabase
+      .channel('redapple-realtime-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' },
+        () => refetchFromSupabase())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'assignments' },
+        () => refetchFromSupabase())
+      .subscribe()
+
+    // 視窗可見性：切分頁回來、切 App 回來 → 重抓最新資料
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refetchFromSupabase()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      supabase.removeChannel(channel)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [refetchFromSupabase])
+
   const setDailyAssignments = useCallback((updater) => {
     setDailyAssignmentsLocal(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater
@@ -188,7 +235,7 @@ function AppInner({ signOut, user }) {
 
   return (
     <div className="min-h-screen" style={{ background: '#FBF6EC', color: '#3D2817' }}>
-      <Header syncing={syncing} lastSync={lastSync} isOnline={isOnline} user={user} signOut={signOut} />
+      <Header syncing={syncing} lastSync={lastSync} isOnline={isOnline} user={user} signOut={signOut} onSync={refetchFromSupabase} />
       <TabNav tab={tab} setTab={setTab} />
       <main className="max-w-7xl mx-auto px-6 py-6">
         {tab === 'matching' && (

@@ -1,8 +1,8 @@
-import { useState } from 'react'
-import { LogOut, User } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { LogOut, User, RefreshCw } from 'lucide-react'
 import { todayStr, weekDay } from '../utils/date.js'
 
-export default function Header({ syncing, lastSync, isOnline, user, signOut }) {
+export default function Header({ syncing, lastSync, isOnline, user, signOut, onSync }) {
   const [confirmLogout, setConfirmLogout] = useState(false)
 
   const userDisplay = user?.user_metadata?.display_name
@@ -44,6 +44,14 @@ export default function Header({ syncing, lastSync, isOnline, user, signOut }) {
                   style={{ background: isOnline ? '#7A9474' : '#C68B4F' }}></span>
                 {isOnline ? '雲端同步' : '離線模式'}
               </span>
+              {/* 手動同步按鈕 */}
+              {isOnline && onSync && (
+                <button onClick={onSync}
+                  className="flex items-center gap-1 text-xs flex-shrink-0 hover:opacity-70 transition"
+                  style={{ color: '#7A9474' }} title="立即同步最新資料">
+                  <RefreshCw size={11}/> 同步
+                </button>
+              )}
             </div>
           </div>
         </div>

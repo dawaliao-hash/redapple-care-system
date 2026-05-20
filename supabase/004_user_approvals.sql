@@ -52,3 +52,8 @@ SELECT id, email, 'approved', NOW()
 FROM auth.users
 WHERE email != 'amuy.chen@gmail.com'
 ON CONFLICT (id) DO NOTHING;
+
+-- ── 5. 開啟 Realtime（讓多用戶同步即時生效）────────────────────
+-- 將出缺席與配對資料表加入 realtime 訂閱
+ALTER PUBLICATION supabase_realtime ADD TABLE attendance;
+ALTER PUBLICATION supabase_realtime ADD TABLE assignments;
