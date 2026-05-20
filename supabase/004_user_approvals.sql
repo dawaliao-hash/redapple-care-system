@@ -1,5 +1,5 @@
 -- ================================================================
--- 004: 帳號審核系統
+-- 004: 帳號審核系統（安全版 — 可重複執行，不會因已存在而報錯）
 -- 在 Supabase Dashboard > SQL Editor 貼上並執行
 -- ================================================================
 
@@ -7,14 +7,22 @@
 CREATE TABLE IF NOT EXISTS user_approvals (
   id          uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email       text NOT NULL,
-  status      text NOT NULL DEFAULT 'pending',  -- pending / approved / rejected
+  status      text NOT NULL DEFAULT 'pending',
   created_at  timestamptz DEFAULT now(),
   approved_at timestamptz,
   note        text
 );
 
--- ── 2. RLS 政策 ─────────────────────────────────────────────────
+-- ── 2. RLS 政策（先刪舊的再建新的，避免重複執行報錯）────────────
 ALTER TABLE user_approvals ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "users_read_own"   ON user_approvals;
+DROP POLICY IF EXISTS "admin_read_all"   ON user_approvals;
+DROP POLICY IF EXISTS "admin_update"     ON user_approvals;
+DROP POLICY IF EXISTS "users_insert_own" ON user_approvals;
+DROP POLICY IF EXISTS "self_read"        ON user_approvals;
+DROP POLICY IF EXISTS "admin_all"        ON user_approvals;
+DROP POLICY IF EXISTS "self_insert"      ON user_approvals;
 
 -- 使用者可讀取自己的審核狀態
 CREATE POLICY "users_read_own" ON user_approvals
@@ -39,21 +47,32 @@ SET raw_user_meta_data =
   || '{"role": "admin", "display_name": "Amy Chen"}'::jsonb
 WHERE email = 'amuy.chen@gmail.com';
 
--- 將管理員帳號標記為 approved（避免自己被擋在審核外）
+-- 管理員標記為 approved
 INSERT INTO user_approvals (id, email, status, approved_at)
 SELECT id, email, 'approved', NOW()
 FROM auth.users
 WHERE email = 'amuy.chen@gmail.com'
 ON CONFLICT (id) DO UPDATE SET status = 'approved', approved_at = NOW();
 
--- 同樣 approved 現有其他帳號（舊帳號不需要重新審核）
+-- 所有現有帳號一律標為 approved（舊帳號不需重新審核）
 INSERT INTO user_approvals (id, email, status, approved_at)
 SELECT id, email, 'approved', NOW()
 FROM auth.users
 WHERE email != 'amuy.chen@gmail.com'
 ON CONFLICT (id) DO NOTHING;
 
--- ── 5. 開啟 Realtime（讓多用戶同步即時生效）────────────────────
--- 將出缺席與配對資料表加入 realtime 訂閱
-ALTER PUBLICATION supabase_realtime ADD TABLE attendance;
-ALTER PUBLICATION supabase_realtime ADD TABLE assignments;
+-- ── 4. 開啟 Realtime 即時同步（安全版）──────────────────────────
+-- 若資料表已在 publication 中會忽略錯誤
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE attendance;
+EXCEPTION WHEN others THEN
+  NULL; -- 已存在則跳過
+END $$;
+
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE assignments;
+EXCEPTION WHEN others THEN
+  NULL;
+END $$;
