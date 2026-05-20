@@ -11,7 +11,7 @@ import { useHolidaySync } from './utils/useHolidaySync.js'
 import { isOnline } from './lib/supabase.js'
 import {
   fetchAttendanceForMonth, upsertAttendance,
-  fetchAssignmentsForDate, upsertAssignment,
+  fetchAssignmentsForDate, upsertAssignment, upsertAssignmentsBulk,
   fetchHealthRecords, insertHealthRecord,
   checkApprovalStatus,
 } from './api/index.js'
@@ -106,14 +106,13 @@ function AppInner({ signOut, user }) {
       [todayStr]: typeof updater === 'function' ? updater(prev[todayStr] ?? {}) : updater,
     })), [setMonthlyAttendance])
 
-  // ── 每日照服員配對（localStorage 快取 + Supabase 同步）────────
+  // ── 每日照服員配對（Supabase 為唯一來源，_v2 清除舊快取）──────
+  // 初始值空白，讓 Supabase fetch 決定內容
   const [dailyAssignments, setDailyAssignmentsLocal] = useLocalStorage(
-    'redapple_daily_assignments',
-    () => ({ [todayStr]: defaultAssignments() })
+    'redapple_daily_assignments_v2', () => ({})
   )
 
-  // 同步計算「有效配對」：若 localStorage 今天是空的，直接 fallback 到 primaryCaregiver
-  // 用 useMemo 而非 useEffect，避免 stale closure + 同 reference 不觸發的問題
+  // UI fallback：Supabase 尚未回應前，以 primaryCaregiver 暫時顯示
   const effectiveDailyAssignments = useMemo(() => {
     const todayAsgn = dailyAssignments[todayStr]
     if (todayAsgn && Object.keys(todayAsgn).length > 0) return dailyAssignments
@@ -122,25 +121,26 @@ function AppInner({ signOut, user }) {
     return { ...dailyAssignments, [todayStr]: defaults }
   }, [dailyAssignments, defaultAssignments])
 
-  // 若今天是空的，把預設值寫回 localStorage（方便下次直接讀到）
+  // 初始化：從 Supabase 拉今日配對；若 Supabase 空白，把 defaultAssignments 寫進去
+  // 確保所有裝置讀同一份資料
+  const assignmentInitDone = useRef(false)
   useEffect(() => {
-    setDailyAssignmentsLocal(prev => {
-      const todayAsgn = prev[todayStr]
-      if (todayAsgn && Object.keys(todayAsgn).length > 0) return prev
-      const defaults = defaultAssignments()
-      if (!Object.keys(defaults).length) return prev
-      return { ...prev, [todayStr]: defaults }
-    })
-  }, [defaultAssignments])
+    if (!isOnline || assignmentInitDone.current) return
+    const defaults = defaultAssignments()
+    if (!Object.keys(defaults).length) return  // recipients 尚未載入，稍後再試
 
-  useEffect(() => {
-    if (!isOnline) return
+    assignmentInitDone.current = true
     fetchAssignmentsForDate(todayStr).then(remote => {
       if (remote && Object.keys(remote).length > 0) {
+        // Supabase 有資料 → 以 Supabase 為準，覆蓋本地快取
         setDailyAssignmentsLocal(prev => ({ ...prev, [todayStr]: remote }))
+      } else {
+        // Supabase 空白 → 將 defaultAssignments 寫入 Supabase，所有裝置共用同一份
+        setDailyAssignmentsLocal(prev => ({ ...prev, [todayStr]: defaults }))
+        upsertAssignmentsBulk(todayStr, defaults).catch(console.error)
       }
     })
-  }, [])
+  }, [defaultAssignments])
 
   // ── 多用戶即時同步 ────────────────────────────────────────────
   // 節流：同一秒內的多次觸發只執行一次

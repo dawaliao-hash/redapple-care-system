@@ -186,6 +186,18 @@ export async function upsertAssignment(date, recipientId, caregiverId) {
   if (error) throw error
 }
 
+// 批次寫入整天的配對（初始化或整日重設用）
+export async function upsertAssignmentsBulk(date, assignments) {
+  if (!isOnline || !Object.keys(assignments).length) return
+  const rows = Object.entries(assignments).map(([rid, cid]) => ({
+    date, recipient_id: rid, caregiver_id: cid,
+  }))
+  const { error } = await supabase
+    .from('assignments')
+    .upsert(rows, { onConflict: 'date,recipient_id' })
+  if (error) throw error
+}
+
 // ════════════════════════════════════════════════════════════
 // HEALTH RECORDS
 // ════════════════════════════════════════════════════════════
