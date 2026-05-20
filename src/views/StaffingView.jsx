@@ -6,13 +6,12 @@ import { formatDisplayDate } from '../data/monthlyAttendance.js'
 
 const WD = ['日','一','二','三','四','五','六']
 
-// 缺席狀態簡寫
+// 缺席狀態簡寫（喘息仍算服務中，故顯示照服員而非缺席標記）
 const ABSENT_SHORT = {
   rest:    { label: '休', bg: '#F5E6D3', text: '#A0541E' },
   hospital:{ label: '住', bg: '#F0D5D0', text: '#8B2C20' },
   clinic:  { label: '診', bg: '#D8E2EA', text: '#2D4F6A' },
   blood:   { label: '抽', bg: '#EDD8DC', text: '#8B3A4A' },
-  respite: { label: '喘', bg: '#E2D5E8', text: '#5C2D6A' },
   holiday: { label: '假', bg: '#F0EBF8', text: '#6A3D8E' },
   absent:  { label: '✕', bg: '#EAE5DA', text: '#6B5D4A' },
 }
@@ -148,7 +147,7 @@ export default function StaffingView({
             雲林縣家園關懷協會附設雲林縣私立紅蘋果社區式服務類長期照顧服務機構
           </p>
           <p className="text-xs mt-0.5" style={{ color: '#8B6F47' }}>
-            每格顯示當日負責照服員 · 未設定配對日期以主責照服員顯示 · 橫向滑動查看全月
+            每格顯示當日負責照服員（含喘息服務）· 未設定配對日期以主責照服員顯示 · 橫向滑動查看全月
           </p>
         </div>
 
