@@ -50,17 +50,25 @@ function AppInner({ signOut, user }) {
   const [tab, setTab] = useState('matching')
 
   // ── 月度出缺席（localStorage 快取 + Supabase 同步）──────────
+  // v2：版本號更新讓舊的假資料快取自動失效
   const [monthlyAttendance, setMonthlyAttendanceLocal] = useLocalStorage(
-    'redapple_monthly_attendance', generateMonthlyAttendance
+    'redapple_monthly_attendance_v2', generateMonthlyAttendance
   )
 
-  // 深層合併出缺席：保留本地未同步的欄位，同時套用遠端更新
+  // Supabase 是正確來源：用遠端資料完整取代涵蓋月份，清除本地假資料
   const mergeAttendance = useCallback((remote) => {
     if (!Object.keys(remote).length) return
     setMonthlyAttendanceLocal(prev => {
-      const merged = { ...prev }
+      // 找出 Supabase 資料涵蓋哪些「年/月」（例如 '2026/05'）
+      const remoteMonths = new Set(Object.keys(remote).map(d => d.slice(0, 7)))
+      const merged = {}
+      // 保留 Supabase 未涵蓋月份的本地資料
+      Object.entries(prev).forEach(([date, data]) => {
+        if (!remoteMonths.has(date.slice(0, 7))) merged[date] = data
+      })
+      // Supabase 涵蓋的月份：完全以遠端資料為準
       Object.entries(remote).forEach(([date, dayData]) => {
-        merged[date] = { ...(prev[date] ?? {}), ...dayData }
+        merged[date] = dayData
       })
       return merged
     })

@@ -68,16 +68,8 @@ export const generateMonthlyAttendance = () => {
     if (holi) {
       // 國定假日：全員預設「假日」
       result[dk] = buildHolidayAttendance()
-    } else if (isToday) {
-      result[dk] = buildTodayAttendance()
-    } else if (isPast) {
-      const dayData = {}
-      RECIPIENTS.forEach((r, ri) => {
-        dayData[r.id] = randomStatus(day * 31 + ri * 7 + r.id.charCodeAt(1))
-      })
-      result[dk] = dayData
     }
-    // 未來非假日：留空（undefined），表示尚未設定
+    // 過去、今天、未來非假日：不生成假資料，留空讓 Supabase 填入
   }
 
   return result
