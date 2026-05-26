@@ -198,11 +198,19 @@ function MeasureModal({ initial, recipientName, caregivers, onSave, onClose }) {
 export default function HealthView({ healthRecords, setHealthRecords, addHealthRecord, onSelectRecipient }) {
   const { recipients: RECIPIENTS, caregivers: CAREGIVERS } = useData()
 
-  // 左側選擇的長者
+  // 長者選擇
   const [pickedId, setPickedId] = useState(RECIPIENTS[0]?.id ?? '')
+  // 手機版：'list' 顯示清單，'detail' 顯示詳細頁
+  const [mobileView, setMobileView] = useState('list')
+
   useEffect(() => {
     if (pickedId === '' && RECIPIENTS.length > 0) setPickedId(RECIPIENTS[0].id)
   }, [RECIPIENTS, pickedId])
+
+  const pickRecipient = (id) => {
+    setPickedId(id)
+    setMobileView('detail')
+  }
 
   const recipient = RECIPIENTS.find(r => r.id === pickedId)
   const records   = healthRecords[pickedId] || []
@@ -315,13 +323,14 @@ export default function HealthView({ healthRecords, setHealthRecords, addHealthR
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
 
-      {/* 左側長者列表 */}
-      <div className="rounded-2xl p-3 border lg:col-span-1 scrollbar-thin"
+      {/* 左側長者列表：手機版只在 list 頁顯示，桌機版永遠顯示 */}
+      <div
+        className={`rounded-2xl p-3 border lg:col-span-1 scrollbar-thin ${mobileView === 'detail' ? 'hidden lg:block' : 'block'}`}
         style={{ background: '#FFFAF0', borderColor: '#E5D5B7', maxHeight: 700, overflowY: 'auto' }}>
         <h3 className="font-display font-semibold px-2 py-2 mb-1" style={{ color: '#5C2828' }}>選擇長者</h3>
         <div className="space-y-1">
           {RECIPIENTS.map(r => (
-            <button key={r.id} onClick={() => setPickedId(r.id)}
+            <button key={r.id} onClick={() => pickRecipient(r.id)}
               className="w-full text-left px-3 py-2.5 rounded-lg transition-all flex items-center justify-between"
               style={{ background: pickedId === r.id ? '#FBE8DC' : 'transparent' }}>
               <div>
@@ -329,14 +338,22 @@ export default function HealthView({ healthRecords, setHealthRecords, addHealthR
                   style={{ color: pickedId === r.id ? '#A53838' : '#5C2828' }}>{r.name}</div>
                 <div className="text-xs font-mono" style={{ color: '#8B6F47' }}>{r.code}</div>
               </div>
-              {pickedId === r.id && <ChevronRight size={16} style={{ color: '#A53838' }} />}
+              <ChevronRight size={16} style={{ color: pickedId === r.id ? '#A53838' : '#C4A87A' }} />
             </button>
           ))}
         </div>
       </div>
 
-      {/* 主內容 */}
-      <div className="lg:col-span-3 space-y-5">
+      {/* 主內容：手機版只在 detail 頁顯示，桌機版永遠顯示 */}
+      <div className={`lg:col-span-3 space-y-5 ${mobileView === 'list' ? 'hidden lg:block' : 'block'}`}>
+
+        {/* 手機版返回按鈕 */}
+        <button
+          onClick={() => setMobileView('list')}
+          className="flex lg:hidden items-center gap-2 px-3 py-2 rounded-lg text-sm border transition hover:bg-orange-50"
+          style={{ borderColor: '#C4A87A', color: '#5C3A1E' }}>
+          <ChevronLeft size={16} /> 返回長者列表
+        </button>
 
         {/* 長者資訊卡 */}
         <div className="rounded-2xl p-5 border flex items-start justify-between flex-wrap gap-4"
