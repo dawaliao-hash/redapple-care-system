@@ -36,36 +36,53 @@ export function DataProvider({ children }) {
 
   // ── CRUD — 長者 ────────────────────────────────────────────
   const addRecipient = async (r) => {
-    const saved = await upsertRecipient(r)
-    setRecipients(prev => [...prev, saved])
-    setLocalR(prev => [...prev, saved])
+    // 先樂觀更新本地，再嘗試同步 Supabase
+    setRecipients(prev => [...prev, r])
+    setLocalR(prev => [...prev, r])
+    try {
+      const saved = await upsertRecipient(r)
+      setRecipients(prev => prev.map(x => x.id === saved.id ? saved : x))
+      setLocalR(prev => prev.map(x => x.id === saved.id ? saved : x))
+    } catch (e) { console.error('[DataContext] addRecipient:', e) }
   }
   const updateRecipient = async (r) => {
-    const saved = await upsertRecipient(r)
-    setRecipients(prev => prev.map(x => x.id === saved.id ? saved : x))
-    setLocalR(prev => prev.map(x => x.id === saved.id ? saved : x))
+    setRecipients(prev => prev.map(x => x.id === r.id ? r : x))
+    setLocalR(prev => prev.map(x => x.id === r.id ? r : x))
+    try {
+      const saved = await upsertRecipient(r)
+      setRecipients(prev => prev.map(x => x.id === saved.id ? saved : x))
+      setLocalR(prev => prev.map(x => x.id === saved.id ? saved : x))
+    } catch (e) { console.error('[DataContext] updateRecipient:', e) }
   }
   const deleteRecipient = async (id) => {
-    await apiDeleteRecipient(id)
     setRecipients(prev => prev.filter(x => x.id !== id))
     setLocalR(prev => prev.filter(x => x.id !== id))
+    try { await apiDeleteRecipient(id) } catch (e) { console.error('[DataContext] deleteRecipient:', e) }
   }
 
   // ── CRUD — 照服員 ─────────────────────────────────────────
   const addCaregiver = async (c) => {
-    const saved = await upsertCaregiver(c)
-    setCaregivers(prev => [...prev, saved])
-    setLocalC(prev => [...prev, saved])
+    setCaregivers(prev => [...prev, c])
+    setLocalC(prev => [...prev, c])
+    try {
+      const saved = await upsertCaregiver(c)
+      setCaregivers(prev => prev.map(x => x.id === saved.id ? saved : x))
+      setLocalC(prev => prev.map(x => x.id === saved.id ? saved : x))
+    } catch (e) { console.error('[DataContext] addCaregiver:', e) }
   }
   const updateCaregiver = async (c) => {
-    const saved = await upsertCaregiver(c)
-    setCaregivers(prev => prev.map(x => x.id === saved.id ? saved : x))
-    setLocalC(prev => prev.map(x => x.id === saved.id ? saved : x))
+    setCaregivers(prev => prev.map(x => x.id === c.id ? c : x))
+    setLocalC(prev => prev.map(x => x.id === c.id ? c : x))
+    try {
+      const saved = await upsertCaregiver(c)
+      setCaregivers(prev => prev.map(x => x.id === saved.id ? saved : x))
+      setLocalC(prev => prev.map(x => x.id === saved.id ? saved : x))
+    } catch (e) { console.error('[DataContext] updateCaregiver:', e) }
   }
   const deleteCaregiver = async (id) => {
-    await apiDeleteCaregiver(id)
     setCaregivers(prev => prev.filter(x => x.id !== id))
     setLocalC(prev => prev.filter(x => x.id !== id))
+    try { await apiDeleteCaregiver(id) } catch (e) { console.error('[DataContext] deleteCaregiver:', e) }
   }
 
   return (

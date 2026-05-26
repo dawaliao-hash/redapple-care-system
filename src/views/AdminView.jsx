@@ -48,14 +48,26 @@ function calcAgeFromBirth(y, m, d) {
   return age >= 0 ? age : null
 }
 
+// 確保 disabilities 永遠是 { categories: [], level: '輕度' } 格式
+function normalizeDisabilities(d) {
+  if (!d || Array.isArray(d)) return { categories: [], level: '輕度' }
+  return {
+    categories: Array.isArray(d.categories) ? d.categories : [],
+    level: d.level ?? '輕度',
+  }
+}
+
 function RecipientModal({ initial, caregivers, onSave, onClose }) {
   const isNew = !initial?.id
-  const [form, setForm] = useState(initial ?? {
-    id: `r${Date.now()}`, code: '', name: '', gender: '女', age: '',
-    cms: 5, primaryCaregiver: caregivers[0]?.id ?? '',
-    conditions: [], emergencyContact: '', phone: '', address: '',
-    bathDays: [], notes: '', level: '第三類',
-    disabilities: { categories: [], level: '輕度' },
+  const [form, setForm] = useState(() => {
+    if (!initial) return {
+      id: `r${Date.now()}`, code: '', name: '', gender: '女', age: '',
+      cms: 5, primaryCaregiver: caregivers[0]?.id ?? '',
+      conditions: [], emergencyContact: '', phone: '', address: '',
+      bathDays: [], notes: '', level: '第三類',
+      disabilities: { categories: [], level: '輕度' },
+    }
+    return { ...initial, disabilities: normalizeDisabilities(initial.disabilities) }
   })
   const [condInput, setCondInput] = useState((initial?.conditions ?? []).join('、'))
   const [err, setErr] = useState('')
@@ -806,8 +818,8 @@ export default function AdminView() {
         <RecipientModal
           initial={editRecipient.id ? editRecipient : null}
           caregivers={caregivers}
-          onSave={async (r) => {
-            await (editRecipient.id ? updateRecipient(r) : addRecipient(r))
+          onSave={(r) => {
+            editRecipient.id ? updateRecipient(r) : addRecipient(r)
             setEditRecipient(null)
           }}
           onClose={() => setEditRecipient(null)}
