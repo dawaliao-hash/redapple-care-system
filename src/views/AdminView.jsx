@@ -8,6 +8,21 @@ const CG_COLORS = ['#B8543A','#7A9474','#C68B4F','#8E6BA8','#5B7B8C',
                    '#4A7FA5','#A0522D','#6B8E6B','#B8860B','#8B4789']
 
 const BATH_OPTIONS = ['一','二','三','四','五']
+
+// ── 身障證明 ──────────────────────────────────────────────
+const DISABILITY_CATEGORIES = [
+  { value: '1', label: '第一類', desc: '神經系統構造及精神、心智功能' },
+  { value: '2', label: '第二類', desc: '眼、耳及相關構造與感官功能及疼痛' },
+  { value: '3', label: '第三類', desc: '聲音與言語構造及其功能' },
+  { value: '4', label: '第四類', desc: '循環、造血、免疫與呼吸系統構造及其功能' },
+  { value: '5', label: '第五類', desc: '消化、新陳代謝與內分泌系統相關構造及其功能' },
+  { value: '6', label: '第六類', desc: '泌尿與生殖系統相關構造及其功能' },
+  { value: '7', label: '第七類', desc: '神經、肌肉、骨骼之移動相關構造及其功能' },
+  { value: '8', label: '第八類', desc: '皮膚與相關構造及其功能' },
+]
+const DISABILITY_LEVELS = ['輕度', '中度', '重度', '極重度']
+const DISABILITY_MAX = 3
+
 const LEVEL_OPTIONS = [
   { value: '第一類', label: '第一類', desc: '低收入戶' },
   { value: '第二類', label: '第二類', desc: '中低收入戶' },
@@ -40,6 +55,7 @@ function RecipientModal({ initial, caregivers, onSave, onClose }) {
     cms: 5, primaryCaregiver: caregivers[0]?.id ?? '',
     conditions: [], emergencyContact: '', phone: '', address: '',
     bathDays: [], notes: '', level: '第三類',
+    disabilities: { categories: [], level: '輕度' },
   })
   const [condInput, setCondInput] = useState((initial?.conditions ?? []).join('、'))
   const [err, setErr] = useState('')
@@ -195,6 +211,85 @@ function RecipientModal({ initial, caregivers, onSave, onClose }) {
           <Field label="備註" cls="sm:col-span-2">
             <textarea rows={2} className={inputCls} style={inputSt} value={form.notes}
               onChange={e => set('notes', e.target.value)} placeholder="特殊注意事項" />
+          </Field>
+
+          {/* ── 身障證明 ── */}
+          <Field label="身障證明（最多 3 類）" cls="sm:col-span-2">
+            <div className="space-y-2">
+              {/* 已選類別列表 */}
+              {(form.disabilities?.categories ?? []).map((cat, idx) => {
+                const catInfo = DISABILITY_CATEGORIES.find(c => c.value === cat)
+                return (
+                  <div key={idx} className="flex gap-2 items-center">
+                    <select
+                      value={cat}
+                      onChange={e => {
+                        const next = [...(form.disabilities?.categories ?? [])]
+                        next[idx] = e.target.value
+                        set('disabilities', { ...form.disabilities, categories: next })
+                      }}
+                      style={{ ...selSt, flex: 1, minWidth: 0 }}>
+                      {DISABILITY_CATEGORIES.map(c => (
+                        <option key={c.value} value={c.value}>{c.label} {c.desc}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => {
+                        const next = (form.disabilities?.categories ?? []).filter((_, i) => i !== idx)
+                        set('disabilities', { ...form.disabilities, categories: next })
+                      }}
+                      className="p-1.5 rounded-lg hover:bg-red-50 transition flex-shrink-0"
+                      style={{ color: '#A53838' }} title="移除">
+                      <X size={14} />
+                    </button>
+                  </div>
+                )
+              })}
+
+              {/* 新增類別按鈕 */}
+              {(form.disabilities?.categories ?? []).length < DISABILITY_MAX && (
+                <button
+                  onClick={() => set('disabilities', {
+                    ...form.disabilities,
+                    categories: [...(form.disabilities?.categories ?? []), '1'],
+                    level: form.disabilities?.level ?? '輕度',
+                  })}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition hover:bg-orange-50"
+                  style={{ borderColor: '#C4A87A', color: '#5C3A1E' }}>
+                  <Plus size={13} /> 新增障礙類別
+                </button>
+              )}
+
+              {/* 障礙等級：只在有選類別時顯示，共用一個 */}
+              {(form.disabilities?.categories ?? []).length > 0 && (
+                <div className="flex items-center gap-3 pt-1">
+                  <span className="text-sm flex-shrink-0" style={{ color: '#8B6F47' }}>障礙等級</span>
+                  <select
+                    value={form.disabilities?.level ?? '輕度'}
+                    onChange={e => set('disabilities', { ...form.disabilities, level: e.target.value })}
+                    style={{ ...selSt, width: 110 }}>
+                    {DISABILITY_LEVELS.map(l => (
+                      <option key={l} value={l}>{l}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* 標籤預覽 */}
+              {(form.disabilities?.categories ?? []).length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {(form.disabilities.categories).map((cat, idx) => {
+                    const catInfo = DISABILITY_CATEGORIES.find(c => c.value === cat)
+                    return (
+                      <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium"
+                        style={{ background: '#E8D5F5', color: '#6B3FA0' }}>
+                        {catInfo?.label ?? `第${cat}類`}・{form.disabilities.level ?? '輕度'}
+                      </span>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </Field>
         </div>
         {err && (

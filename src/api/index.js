@@ -23,6 +23,7 @@ const toRow = (r) => ({
   bath_days: r.bathDays ?? [],
   notes: r.notes,
   level: r.level,
+  disabilities: r.disabilities ?? [],
 })
 
 const fromRow = (row) => ({
@@ -40,6 +41,7 @@ const fromRow = (row) => ({
   bathDays: row.bath_days ?? [],
   notes: row.notes,
   level: row.level,
+  disabilities: row.disabilities ?? [],
 })
 
 const cgFromRow = (row) => ({
