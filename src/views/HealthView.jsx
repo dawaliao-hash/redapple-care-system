@@ -196,7 +196,7 @@ function MeasureModal({ initial, recipientName, caregivers, onSave, onClose }) {
 // 主 HealthView
 // ════════════════════════════════════════════════════════
 export default function HealthView({ healthRecords, setHealthRecords, addHealthRecord, onSelectRecipient }) {
-  const { recipients: RECIPIENTS, caregivers: CAREGIVERS } = useData()
+  const { activeRecipients: RECIPIENTS, activeCaregivers: CAREGIVERS } = useData()
 
   // 長者選擇
   const [pickedId, setPickedId] = useState(RECIPIENTS[0]?.id ?? '')

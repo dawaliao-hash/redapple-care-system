@@ -65,7 +65,7 @@ export default function StatsView({
   monthlyAttendance = {}, dailyAssignments = {},
   onSelectRecipient,
 }) {
-  const { recipients: RECIPIENTS, caregivers: CAREGIVERS } = useData()
+  const { activeRecipients: RECIPIENTS, activeCaregivers: CAREGIVERS } = useData()
   const [selectedCg, setSelectedCg] = useState(null)
 
   const days = useMemo(() => {

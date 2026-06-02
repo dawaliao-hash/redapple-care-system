@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { RECIPIENTS as INIT_R } from '../data/recipients.js'
 import { CAREGIVERS as INIT_C } from '../data/caregivers.js'
 import {
@@ -135,11 +135,22 @@ export function DataProvider({ children }) {
     try { await apiDeleteCaregiver(id) } catch (e) { console.error('[DataContext] deleteCaregiver:', e) }
   }
 
+  // 過濾後的版本：各 view 應使用這兩個（管理頁面才需要 all）
+  const activeRecipients = useMemo(
+    () => recipients.filter(r => r.isActive !== false),
+    [recipients]
+  )
+  const activeCaregivers = useMemo(
+    () => caregivers.filter(c => c.isActive !== false),
+    [caregivers]
+  )
+
   return (
     <DataContext.Provider value={{
       loading,
       recipients, setRecipients, addRecipient, updateRecipient, deleteRecipient,
       caregivers, setCaregivers, addCaregiver, updateCaregiver, deleteCaregiver,
+      activeRecipients, activeCaregivers,
     }}>
       {children}
     </DataContext.Provider>

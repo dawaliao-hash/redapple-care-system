@@ -165,7 +165,7 @@ const REPORT_TYPES = [
 
 // ════════════════════════════════════════════════════════
 export default function ReportView({ monthlyAttendance }) {
-  const { recipients: allRecipients } = useData()
+  const { activeRecipients: allRecipients } = useData()
   const today = new Date()
 
   const [reportType, setReportType] = useState('monthly')

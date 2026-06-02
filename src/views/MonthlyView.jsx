@@ -39,7 +39,7 @@ export default function MonthlyView({
   recipientOrder = [], setRecipientOrder,
   holidays = {},
 }) {
-  const { recipients: RECIPIENTS } = useData()
+  const { activeRecipients: RECIPIENTS } = useData()
   const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d }, [])
 
   // 依共用 recipientOrder 排列（新增長者接在最後）

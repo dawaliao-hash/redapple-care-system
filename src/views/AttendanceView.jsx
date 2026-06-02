@@ -10,7 +10,7 @@ export default function AttendanceView({
   recipientOrder, setRecipientOrder,   // 由 App.jsx 傳入，與月度點名、配對總覽共用
   onSelectRecipient, holidays = {},
 }) {
-  const { recipients: RECIPIENTS, caregivers: CAREGIVERS } = useData()
+  const { activeRecipients: RECIPIENTS, activeCaregivers: CAREGIVERS } = useData()
   const [filterStatus, setFilterStatus] = useState('all')
   const [search, setSearch]             = useState('')
 

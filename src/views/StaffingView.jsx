@@ -41,7 +41,7 @@ export default function StaffingView({
   setRecipientOrder,
   holidays = {},
 }) {
-  const { recipients: RECIPIENTS, caregivers: CAREGIVERS } = useData()
+  const { activeRecipients: RECIPIENTS, activeCaregivers: CAREGIVERS } = useData()
   const today    = new Date()
   const todayStr = formatDisplayDate(today)
 

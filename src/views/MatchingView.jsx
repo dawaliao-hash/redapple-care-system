@@ -117,7 +117,7 @@ export default function MatchingView({
   recipientOrder = [],    // 共用排序（唯讀）
   onSelectRecipient,
 }) {
-  const { recipients, caregivers } = useData()
+  const { activeRecipients: recipients, activeCaregivers: caregivers } = useData()
 
   // 依共用排序排列長者清單
   const sortedRecipients = useMemo(() => {
