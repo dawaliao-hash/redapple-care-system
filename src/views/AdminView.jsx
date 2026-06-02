@@ -397,12 +397,63 @@ function RecipientModal({ initial, caregivers, allRecipients, onSave, onClose })
 }
 
 // ════════════════════════════════════════════════════════
+// 照服員離職 Modal
+// ════════════════════════════════════════════════════════
+function ResignModal({ caregiver, onConfirm, onClose }) {
+  const today = new Date()
+  const todayStr = `${today.getFullYear()}/${String(today.getMonth()+1).padStart(2,'0')}/${String(today.getDate()).padStart(2,'0')}`
+  const [resignedAt, setResignedAt] = useState(todayStr)
+  const [resignReason, setReason]   = useState('')
+  return (
+    <Overlay onClose={onClose}>
+      <ModalBox title={`離職：${caregiver.name}`} onClose={onClose} maxW={400}>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs mb-1.5 font-medium" style={{ color: '#8B6F47' }}>離職日期 *</label>
+            <input type="date" className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+              style={{ background: '#FBF6EC', borderColor: '#C4A87A', color: '#5C2828' }}
+              value={resignedAt.replace(/\//g, '-')}
+              onChange={e => setResignedAt(e.target.value.replace(/-/g, '/'))} />
+          </div>
+          <div>
+            <label className="block text-xs mb-1.5 font-medium" style={{ color: '#8B6F47' }}>離職原因（選填）</label>
+            <textarea rows={3} className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+              style={{ background: '#FBF6EC', borderColor: '#C4A87A', color: '#5C2828' }}
+              placeholder="例：個人因素、轉職…"
+              value={resignReason} onChange={e => setReason(e.target.value)} />
+          </div>
+        </div>
+        <div className="flex justify-end gap-3 mt-5">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm border transition hover:bg-orange-50"
+            style={{ borderColor: '#C4A87A', color: '#5C3A1E' }}>取消</button>
+          <button onClick={() => onConfirm(resignedAt, resignReason)}
+            className="px-5 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
+            style={{ background: '#A53838', color: 'white' }}>
+            <Archive size={14} /> 確認離職
+          </button>
+        </div>
+      </ModalBox>
+    </Overlay>
+  )
+}
+
+// ════════════════════════════════════════════════════════
 // 照服員表單 Modal（含指定負責長者）
 // ════════════════════════════════════════════════════════
-function CaregiverModal({ initial, allRecipients, onSave, onClose }) {
+function CaregiverModal({ initial, allCaregivers, allRecipients, onSave, onClose }) {
   const isNew = !initial?.id
+
+  // 產生下一個順序 ID：找現有最大數字 + 1
+  const nextId = (() => {
+    const nums = (allCaregivers ?? [])
+      .map(c => parseInt(c.id.replace(/\D/g, ''), 10))
+      .filter(n => !isNaN(n))
+    const max = nums.length ? Math.max(...nums) : 0
+    return `c${max + 1}`
+  })()
+
   const [form, setForm] = useState(initial ?? {
-    id: `c${Date.now()}`, name: '', avatar: '', color: CG_COLORS[0],
+    id: nextId, name: '', avatar: '', color: CG_COLORS[0],
   })
   const [err, setErr] = useState('')
   const [recSearch, setRecSearch] = useState('')
@@ -661,11 +712,13 @@ export default function AdminView() {
 
   const [subTab, setSubTab]               = useState('recipients')
   const [recipientSubTab, setRecipientSubTab] = useState('active') // 'active' | 'closed'
+  const [cgSubTab, setCgSubTab]           = useState('active')     // 'active' | 'resigned'
   const [editRecipient, setEditRecipient] = useState(null)
   const [deleteR, setDeleteR]             = useState(null)
-  const [closeR, setCloseR]               = useState(null) // 結案中
+  const [closeR, setCloseR]               = useState(null)
   const [editCaregiver, setEditCaregiver] = useState(null)
   const [deleteCG, setDeleteCG]           = useState(null)
+  const [resignCG, setResignCG]           = useState(null)
   const [confirmReset, setConfirmReset]   = useState(false)
 
   const handleReset = () => {
@@ -679,12 +732,15 @@ export default function AdminView() {
   }
   const [search, setSearch]               = useState('')
 
-  const activeRecipients = recipients.filter(r => r.isActive !== false)
-  const closedRecipients = recipients.filter(r => r.isActive === false)
+  const activeRecipients  = recipients.filter(r => r.isActive !== false)
+  const closedRecipients  = recipients.filter(r => r.isActive === false)
+  const activeCaregivers  = caregivers.filter(c => c.isActive !== false)
+  const resignedCaregivers = caregivers.filter(c => c.isActive === false)
   const filteredR = (recipientSubTab === 'active' ? activeRecipients : closedRecipients).filter(r =>
     r.name.includes(search) || r.code.includes(search) || (r.conditions?.join('') ?? '').includes(search)
   )
-  const filteredCG = caregivers.filter(c => c.name.includes(search))
+  const filteredCG = (cgSubTab === 'active' ? activeCaregivers : resignedCaregivers)
+    .filter(c => c.name.includes(search))
 
   return (
     <div className="space-y-5">
@@ -789,13 +845,36 @@ export default function AdminView() {
           </div>
         )}
 
+        {/* 在職 / 已離職 切換 */}
+        {subTab === 'caregivers' && (
+          <div className="flex rounded-xl overflow-hidden border" style={{ borderColor: '#C4A87A' }}>
+            {[
+              { id: 'active',   label: '在職',   count: activeCaregivers.length },
+              { id: 'resigned', label: '已離職', count: resignedCaregivers.length },
+            ].map(t => {
+              const on = cgSubTab === t.id
+              return (
+                <button key={t.id} onClick={() => { setCgSubTab(t.id); setSearch('') }}
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition"
+                  style={{ background: on ? '#7A9474' : '#FBF6EC', color: on ? 'white' : '#5C3A1E' }}>
+                  {t.label}
+                  <span className="px-1.5 py-0.5 rounded-full text-xs"
+                    style={{ background: on ? 'rgba(255,255,255,0.25)' : '#EAE0CC',
+                             color: on ? 'white' : '#8B6F47' }}>{t.count}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
         <input
           value={search} onChange={e => setSearch(e.target.value)}
           placeholder={subTab === 'recipients' ? '搜尋姓名 / 編號 / 疾病' : '搜尋姓名'}
           className="flex-1 min-w-[160px] px-3 py-2 rounded-lg border text-sm outline-none"
           style={{ background: '#FBF6EC', borderColor: '#C4A87A', color: '#5C2828' }}
         />
-        {(subTab === 'caregivers' || (subTab === 'recipients' && recipientSubTab === 'active')) && (
+        {((subTab === 'recipients' && recipientSubTab === 'active') ||
+          (subTab === 'caregivers' && cgSubTab === 'active')) && (
           <button
             onClick={() => subTab === 'recipients' ? setEditRecipient({}) : setEditCaregiver({})}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium"
@@ -952,17 +1031,44 @@ export default function AdminView() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex gap-1">
-                        <button onClick={() => setEditCaregiver(cg)}
-                          className="p-1.5 rounded-lg hover:bg-orange-100 transition"
-                          title="編輯" style={{ color: '#A53838' }}>
-                          <Pencil size={14} />
-                        </button>
-                        <button onClick={() => setDeleteCG(cg)}
-                          className="p-1.5 rounded-lg hover:bg-red-50 transition"
-                          title="刪除" style={{ color: '#A53838' }}>
-                          <Trash2 size={14} />
-                        </button>
+                      <div className="flex gap-1 items-center">
+                        {cgSubTab === 'active' ? (
+                          <>
+                            <button onClick={() => setEditCaregiver(cg)}
+                              className="p-1.5 rounded-lg hover:bg-orange-100 transition"
+                              title="編輯" style={{ color: '#A53838' }}>
+                              <Pencil size={14} />
+                            </button>
+                            <button onClick={() => setResignCG(cg)}
+                              className="p-1.5 rounded-lg hover:bg-orange-100 transition"
+                              title="離職" style={{ color: '#8B6F47' }}>
+                              <Archive size={14} />
+                            </button>
+                            <button onClick={() => setDeleteCG(cg)}
+                              className="p-1.5 rounded-lg hover:bg-red-50 transition"
+                              title="刪除" style={{ color: '#A53838' }}>
+                              <Trash2 size={14} />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-xs mr-1" style={{ color: '#8B6F47' }}>
+                              {cg.resignedAt}<br/>
+                              <span style={{ color: '#A09684' }}>{cg.resignReason}</span>
+                            </div>
+                            <button
+                              onClick={() => updateCaregiver({ ...cg, isActive: true, resignedAt: null, resignReason: '' })}
+                              className="p-1.5 rounded-lg hover:bg-green-50 transition"
+                              title="回聘" style={{ color: '#7A9474' }}>
+                              <ArchiveRestore size={14} />
+                            </button>
+                            <button onClick={() => setDeleteCG(cg)}
+                              className="p-1.5 rounded-lg hover:bg-red-50 transition"
+                              title="刪除" style={{ color: '#A53838' }}>
+                              <Trash2 size={14} />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -970,13 +1076,13 @@ export default function AdminView() {
               })}
               {filteredCG.length === 0 && (
                 <tr><td colSpan={4} className="py-10 text-center text-sm" style={{ color: '#A09684' }}>
-                  沒有符合條件的照服員
+                  {cgSubTab === 'resigned' ? '尚無已離職的照服員' : '沒有符合條件的照服員'}
                 </td></tr>
               )}
             </tbody>
           </table>
           <div className="px-4 py-3 text-xs text-right" style={{ color: '#A09684', borderTop: '1px solid #EAE0CC' }}>
-            共 {caregivers.length} 位照服員
+            在職 {activeCaregivers.length} 位 · 已離職 {resignedCaregivers.length} 位
           </div>
         </div>
       )}
@@ -1010,9 +1116,18 @@ export default function AdminView() {
           }}
           onClose={() => setCloseR(null)} />
       )}
+      {resignCG && (
+        <ResignModal caregiver={resignCG}
+          onConfirm={(resignedAt, resignReason) => {
+            updateCaregiver({ ...resignCG, isActive: false, resignedAt, resignReason })
+            setResignCG(null)
+          }}
+          onClose={() => setResignCG(null)} />
+      )}
       {editCaregiver !== null && (
         <CaregiverModal
           initial={editCaregiver.id ? editCaregiver : null}
+          allCaregivers={caregivers}
           allRecipients={recipients}
           onSave={async (c, selectedRecipientIds) => {
             // 1. 儲存照服員基本資料

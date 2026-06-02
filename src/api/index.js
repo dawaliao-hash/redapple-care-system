@@ -57,7 +57,19 @@ const cgFromRow = (row) => ({
   name: row.name,
   avatar: row.avatar,
   color: row.color,
+  isActive:     row.is_active !== false,
+  resignedAt:   row.resigned_at  ?? null,
+  resignReason: row.resign_reason ?? '',
 })
+
+const cgToRow = (c) => ({
+  id: c.id, name: c.name, avatar: c.avatar, color: c.color,
+  is_active:     c.isActive !== false,
+  resigned_at:   c.resignedAt   ?? null,
+  resign_reason: c.resignReason ?? '',
+})
+
+const cgToRowBase = (c) => ({ id: c.id, name: c.name, avatar: c.avatar, color: c.color })
 
 const hrToRow = (recipientId, rec) => ({
   recipient_id: recipientId,
@@ -163,13 +175,29 @@ export async function fetchCaregivers() {
 
 export async function upsertCaregiver(c) {
   if (!isOnline) return c
+
   const { data, error } = await supabase
     .from('caregivers')
-    .upsert({ id: c.id, name: c.name, avatar: c.avatar, color: c.color }, { onConflict: 'id' })
+    .upsert(cgToRow(c), { onConflict: 'id' })
     .select()
     .single()
-  if (error) throw error
-  return cgFromRow(data)
+
+  if (!error) return cgFromRow(data)
+
+  // 若欄位不存在（migration 未執行），降級為基礎欄位重試
+  const isColError = error.code === '42703' || error.message?.includes('column')
+  if (isColError) {
+    console.warn('[API] New caregiver columns not in Supabase yet, retrying with base columns')
+    const { data: d2, error: e2 } = await supabase
+      .from('caregivers')
+      .upsert(cgToRowBase(c), { onConflict: 'id' })
+      .select()
+      .single()
+    if (e2) throw e2
+    return { ...cgFromRow(d2), isActive: c.isActive !== false, resignedAt: c.resignedAt ?? null, resignReason: c.resignReason ?? '' }
+  }
+
+  throw error
 }
 
 export async function deleteCaregiver(id) {
