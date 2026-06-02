@@ -1,4 +1,4 @@
-import { Users, ClipboardList, Activity, Heart, CalendarDays, Settings, UserCog, UserCheck } from 'lucide-react'
+import { Users, ClipboardList, Activity, Heart, CalendarDays, Settings, UserCog, UserCheck, FileBarChart } from 'lucide-react'
 
 const TABS = [
   { id: 'matching',   label: '配對總覽', icon: Users },
@@ -7,6 +7,7 @@ const TABS = [
   { id: 'attendance', label: '今日點名', icon: Activity },
   { id: 'stats',      label: '服務統計', icon: ClipboardList },
   { id: 'health',     label: '健康紀錄', icon: Heart },
+  { id: 'report',     label: '政府報表', icon: FileBarChart },
   { id: 'admin',      label: '機構管理', icon: Settings },
   { id: 'account',    label: '帳號設定', icon: UserCog },
 ]

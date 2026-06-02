@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Pencil, Trash2, X, Check, Users, UserCheck, AlertTriangle, RotateCcw, Cloud, HardDrive } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Check, Users, UserCheck, AlertTriangle, RotateCcw, Cloud, HardDrive, ArchiveRestore, Archive } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { isOnline } from '../lib/supabase.js'
 
@@ -8,6 +8,15 @@ const CG_COLORS = ['#B8543A','#7A9474','#C68B4F','#8E6BA8','#5B7B8C',
                    '#4A7FA5','#A0522D','#6B8E6B','#B8860B','#8B4789']
 
 const BATH_OPTIONS = ['一','二','三','四','五']
+
+// ── 服務身份類別（政府報表用）────────────────────────────
+const SERVICE_CATEGORIES = [
+  { value: 'elderly',        label: '65歲以上老人',         desc: '含IADLs失能且獨居之老人' },
+  { value: 'disabled_65up',  label: '65歲以上身障',          desc: '領有身心障礙證明者' },
+  { value: 'disabled_64down',label: '64歲以下身障',          desc: '領有身心障礙證明者' },
+  { value: 'indigenous',     label: '55-64歲原住民',        desc: '' },
+  { value: 'dementia',       label: '50歲以上失智症者',      desc: '' },
+]
 
 // ── 身障證明 ──────────────────────────────────────────────
 const DISABILITY_CATEGORIES = [
@@ -66,6 +75,7 @@ function RecipientModal({ initial, caregivers, onSave, onClose }) {
       conditions: [], emergencyContact: '', phone: '', address: '',
       bathDays: [], notes: '', level: '第三類',
       disabilities: { categories: [], level: '輕度' },
+      serviceCategory: 'elderly',
     }
     return { ...initial, disabilities: normalizeDisabilities(initial.disabilities) }
   })
@@ -181,6 +191,20 @@ function RecipientModal({ initial, caregivers, onSave, onClose }) {
                            borderColor: '#C4A87A', minWidth: 72 }}>
                   <span>{label}</span>
                   <span style={{ fontSize: 10, opacity: 0.8 }}>{desc}</span>
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="服務身份類別（政府報表）" cls="sm:col-span-2">
+            <div className="flex flex-wrap gap-2">
+              {SERVICE_CATEGORIES.map(({ value, label, desc }) => (
+                <button key={value} onClick={() => set('serviceCategory', value)}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium border transition flex flex-col items-start leading-tight"
+                  style={{ background: form.serviceCategory === value ? '#5B7B8C' : '#FBF6EC',
+                           color: form.serviceCategory === value ? 'white' : '#5C3A1E',
+                           borderColor: '#C4A87A', minWidth: 80 }}>
+                  <span>{label}</span>
+                  {desc && <span style={{ fontSize: 10, opacity: 0.8 }}>{desc}</span>}
                 </button>
               ))}
             </div>
@@ -540,6 +564,47 @@ function DeleteConfirm({ name, onConfirm, onClose }) {
 }
 
 // ════════════════════════════════════════════════════════
+// 結案 Modal
+// ════════════════════════════════════════════════════════
+function CloseModal({ recipient, onConfirm, onClose }) {
+  const today = new Date()
+  const todayStr = `${today.getFullYear()}/${String(today.getMonth()+1).padStart(2,'0')}/${String(today.getDate()).padStart(2,'0')}`
+  const [closedAt, setClosedAt]   = useState(todayStr)
+  const [closeReason, setReason]  = useState('')
+  return (
+    <Overlay onClose={onClose}>
+      <ModalBox title={`結案：${recipient.name}`} onClose={onClose} maxW={400}>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs mb-1.5 font-medium" style={{ color: '#8B6F47' }}>結案日期 *</label>
+            <input type="date" className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+              style={{ background: '#FBF6EC', borderColor: '#C4A87A', color: '#5C2828' }}
+              value={closedAt.replace(/\//g, '-')}
+              onChange={e => setClosedAt(e.target.value.replace(/-/g, '/'))} />
+          </div>
+          <div>
+            <label className="block text-xs mb-1.5 font-medium" style={{ color: '#8B6F47' }}>結案原因（選填）</label>
+            <textarea rows={3} className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+              style={{ background: '#FBF6EC', borderColor: '#C4A87A', color: '#5C2828' }}
+              placeholder="例：轉入機構、往生、家屬撤案…"
+              value={closeReason} onChange={e => setReason(e.target.value)} />
+          </div>
+        </div>
+        <div className="flex justify-end gap-3 mt-5">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm border transition hover:bg-orange-50"
+            style={{ borderColor: '#C4A87A', color: '#5C3A1E' }}>取消</button>
+          <button onClick={() => onConfirm(closedAt, closeReason)}
+            className="px-5 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
+            style={{ background: '#A53838', color: 'white' }}>
+            <Archive size={14} /> 確認結案
+          </button>
+        </div>
+      </ModalBox>
+    </Overlay>
+  )
+}
+
+// ════════════════════════════════════════════════════════
 // 主 AdminView
 // ════════════════════════════════════════════════════════
 export default function AdminView() {
@@ -548,8 +613,10 @@ export default function AdminView() {
           setRecipients, setCaregivers } = useData()
 
   const [subTab, setSubTab]               = useState('recipients')
+  const [recipientSubTab, setRecipientSubTab] = useState('active') // 'active' | 'closed'
   const [editRecipient, setEditRecipient] = useState(null)
   const [deleteR, setDeleteR]             = useState(null)
+  const [closeR, setCloseR]               = useState(null) // 結案中
   const [editCaregiver, setEditCaregiver] = useState(null)
   const [deleteCG, setDeleteCG]           = useState(null)
   const [confirmReset, setConfirmReset]   = useState(false)
@@ -565,7 +632,9 @@ export default function AdminView() {
   }
   const [search, setSearch]               = useState('')
 
-  const filteredR = recipients.filter(r =>
+  const activeRecipients = recipients.filter(r => r.isActive !== false)
+  const closedRecipients = recipients.filter(r => r.isActive === false)
+  const filteredR = (recipientSubTab === 'active' ? activeRecipients : closedRecipients).filter(r =>
     r.name.includes(search) || r.code.includes(search) || (r.conditions?.join('') ?? '').includes(search)
   )
   const filteredCG = caregivers.filter(c => c.name.includes(search))
@@ -650,19 +719,44 @@ export default function AdminView() {
             )
           })}
         </div>
+
+        {/* 在案 / 已結案 切換 */}
+        {subTab === 'recipients' && (
+          <div className="flex rounded-xl overflow-hidden border" style={{ borderColor: '#C4A87A' }}>
+            {[
+              { id: 'active', label: '在案', count: activeRecipients.length },
+              { id: 'closed', label: '已結案', count: closedRecipients.length },
+            ].map(t => {
+              const on = recipientSubTab === t.id
+              return (
+                <button key={t.id} onClick={() => { setRecipientSubTab(t.id); setSearch('') }}
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition"
+                  style={{ background: on ? '#7A9474' : '#FBF6EC', color: on ? 'white' : '#5C3A1E' }}>
+                  {t.label}
+                  <span className="px-1.5 py-0.5 rounded-full text-xs"
+                    style={{ background: on ? 'rgba(255,255,255,0.25)' : '#EAE0CC',
+                             color: on ? 'white' : '#8B6F47' }}>{t.count}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
         <input
           value={search} onChange={e => setSearch(e.target.value)}
           placeholder={subTab === 'recipients' ? '搜尋姓名 / 編號 / 疾病' : '搜尋姓名'}
           className="flex-1 min-w-[160px] px-3 py-2 rounded-lg border text-sm outline-none"
           style={{ background: '#FBF6EC', borderColor: '#C4A87A', color: '#5C2828' }}
         />
-        <button
-          onClick={() => subTab === 'recipients' ? setEditRecipient({}) : setEditCaregiver({})}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium"
-          style={{ background: '#A53838', color: 'white' }}>
-          <Plus size={16} />
-          {subTab === 'recipients' ? '新增長者' : '新增照服員'}
-        </button>
+        {(subTab === 'caregivers' || (subTab === 'recipients' && recipientSubTab === 'active')) && (
+          <button
+            onClick={() => subTab === 'recipients' ? setEditRecipient({}) : setEditCaregiver({})}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium"
+            style={{ background: '#A53838', color: 'white' }}>
+            <Plus size={16} />
+            {subTab === 'recipients' ? '新增長者' : '新增照服員'}
+          </button>
+        )}
       </div>
 
       {/* ── 長者列表 ── */}
@@ -713,16 +807,43 @@ export default function AdminView() {
                       </td>
                       <td className="px-3 py-2.5">
                         <div className="flex gap-1">
-                          <button onClick={() => setEditRecipient(r)}
-                            className="p-1.5 rounded-lg hover:bg-orange-100 transition"
-                            title="編輯" style={{ color: '#A53838' }}>
-                            <Pencil size={14} />
-                          </button>
-                          <button onClick={() => setDeleteR(r)}
-                            className="p-1.5 rounded-lg hover:bg-red-50 transition"
-                            title="刪除" style={{ color: '#A53838' }}>
-                            <Trash2 size={14} />
-                          </button>
+                          {recipientSubTab === 'active' ? (
+                            <>
+                              <button onClick={() => setEditRecipient(r)}
+                                className="p-1.5 rounded-lg hover:bg-orange-100 transition"
+                                title="編輯" style={{ color: '#A53838' }}>
+                                <Pencil size={14} />
+                              </button>
+                              <button onClick={() => setCloseR(r)}
+                                className="p-1.5 rounded-lg hover:bg-orange-100 transition"
+                                title="結案" style={{ color: '#8B6F47' }}>
+                                <Archive size={14} />
+                              </button>
+                              <button onClick={() => setDeleteR(r)}
+                                className="p-1.5 rounded-lg hover:bg-red-50 transition"
+                                title="刪除" style={{ color: '#A53838' }}>
+                                <Trash2 size={14} />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <div className="text-xs mr-1" style={{ color: '#8B6F47' }}>
+                                {r.closedAt}<br/>
+                                <span style={{ color: '#A09684' }}>{r.closeReason}</span>
+                              </div>
+                              <button
+                                onClick={() => updateRecipient({ ...r, isActive: true, closedAt: null, closeReason: '' })}
+                                className="p-1.5 rounded-lg hover:bg-green-50 transition"
+                                title="復原在案" style={{ color: '#7A9474' }}>
+                                <ArchiveRestore size={14} />
+                              </button>
+                              <button onClick={() => setDeleteR(r)}
+                                className="p-1.5 rounded-lg hover:bg-red-50 transition"
+                                title="刪除" style={{ color: '#A53838' }}>
+                                <Trash2 size={14} />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -730,14 +851,14 @@ export default function AdminView() {
                 })}
                 {filteredR.length === 0 && (
                   <tr><td colSpan={10} className="py-10 text-center text-sm" style={{ color: '#A09684' }}>
-                    沒有符合條件的長者
+                    {recipientSubTab === 'closed' ? '尚無已結案的長者' : '沒有符合條件的長者'}
                   </td></tr>
                 )}
               </tbody>
             </table>
           </div>
           <div className="px-4 py-3 text-xs text-right" style={{ color: '#A09684', borderTop: '1px solid #EAE0CC' }}>
-            共 {recipients.length} 位長者，顯示 {filteredR.length} 位
+            在案 {activeRecipients.length} 位 · 已結案 {closedRecipients.length} 位 · 顯示 {filteredR.length} 位
           </div>
         </div>
       )}
@@ -832,6 +953,14 @@ export default function AdminView() {
             setDeleteR(null)
           }}
           onClose={() => setDeleteR(null)} />
+      )}
+      {closeR && (
+        <CloseModal recipient={closeR}
+          onConfirm={(closedAt, closeReason) => {
+            updateRecipient({ ...closeR, isActive: false, closedAt, closeReason })
+            setCloseR(null)
+          }}
+          onClose={() => setCloseR(null)} />
       )}
       {editCaregiver !== null && (
         <CaregiverModal

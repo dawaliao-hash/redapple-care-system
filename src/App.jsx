@@ -26,6 +26,7 @@ import AttendanceView from './views/AttendanceView.jsx'
 import HealthView from './views/HealthView.jsx'
 import AdminView from './views/AdminView.jsx'
 import AccountView from './views/AccountView.jsx'
+import ReportView from './views/ReportView.jsx'
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
 
 const today    = new Date()
@@ -303,6 +304,9 @@ function AppInner({ signOut, user }) {
             addHealthRecord={addHealthRecord}
             onSelectRecipient={setSelectedRecipient}
           />
+        )}
+        {tab === 'report'  && (
+          <ReportView monthlyAttendance={monthlyAttendance} />
         )}
         {tab === 'admin'   && <AdminView />}
         {tab === 'account' && <AccountView user={user} />}

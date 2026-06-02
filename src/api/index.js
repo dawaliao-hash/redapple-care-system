@@ -23,7 +23,11 @@ const toRow = (r) => ({
   bath_days: r.bathDays ?? [],
   notes: r.notes,
   level: r.level,
-  disabilities: r.disabilities ?? [],
+  disabilities: r.disabilities ?? { categories: [], level: '輕度' },
+  service_category: r.serviceCategory ?? 'elderly',
+  is_active: r.isActive !== false,
+  closed_at: r.closedAt ?? null,
+  close_reason: r.closeReason ?? '',
 })
 
 const fromRow = (row) => ({
@@ -41,7 +45,11 @@ const fromRow = (row) => ({
   bathDays: row.bath_days ?? [],
   notes: row.notes,
   level: row.level,
-  disabilities: row.disabilities ?? [],
+  disabilities: row.disabilities ?? { categories: [], level: '輕度' },
+  serviceCategory: row.service_category ?? 'elderly',
+  isActive: row.is_active !== false,
+  closedAt: row.closed_at ?? null,
+  closeReason: row.close_reason ?? '',
 })
 
 const cgFromRow = (row) => ({
