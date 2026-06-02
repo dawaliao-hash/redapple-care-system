@@ -1,11 +1,11 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
 import { RECIPIENTS as INIT_R } from '../data/recipients.js'
 import { CAREGIVERS as INIT_C } from '../data/caregivers.js'
 import {
   fetchRecipients, upsertRecipient, deleteRecipient as apiDeleteRecipient,
   fetchCaregivers, upsertCaregiver, deleteCaregiver as apiDeleteCaregiver,
 } from '../api/index.js'
-import { isOnline } from '../lib/supabase.js'
+import { supabase, isOnline } from '../lib/supabase.js'
 import { useLocalStorage } from '../utils/useLocalStorage.js'
 
 const DataContext = createContext(null)
@@ -25,6 +25,20 @@ export function DataProvider({ children }) {
   const [recipients, setRecipients] = useState(safeR)
   const [caregivers, setCaregivers] = useState(safeC)
 
+  // 從 Supabase 重新拉取長者和照服員（節流：3 秒內不重複）
+  const lastRefetchMs = useRef(0)
+  const refetchData = useCallback(() => {
+    if (!isOnline) return
+    const now = Date.now()
+    if (now - lastRefetchMs.current < 3000) return
+    lastRefetchMs.current = now
+    Promise.all([fetchRecipients(), fetchCaregivers()]).then(([r, c]) => {
+      setRecipients(r); setLocalR(r)
+      setCaregivers(c); setLocalC(c)
+    }).catch(console.error)
+  }, [])
+
+  // 初始載入
   useEffect(() => {
     if (!isOnline) { setLoading(false); return }
     Promise.all([fetchRecipients(), fetchCaregivers()]).then(([r, c]) => {
@@ -33,6 +47,29 @@ export function DataProvider({ children }) {
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [])
+
+  // Realtime 訂閱：其他裝置新增/修改/刪除長者或照服員時即時同步
+  useEffect(() => {
+    if (!isOnline) return
+    const channel = supabase
+      .channel('redapple-data-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'recipients' },
+        () => refetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'caregivers' },
+        () => refetchData())
+      .subscribe()
+
+    // 切回視窗時重抓（確保離線期間的變更也能補上）
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refetchData()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      supabase.removeChannel(channel)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [refetchData])
 
   // ── CRUD — 長者 ────────────────────────────────────────────
   const addRecipient = async (r) => {
