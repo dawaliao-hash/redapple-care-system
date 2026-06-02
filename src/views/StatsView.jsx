@@ -2,9 +2,13 @@ import { useState, useMemo } from 'react'
 import { X, ChevronRight } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { formatDisplayDate } from '../data/monthlyAttendance.js'
+import { STATUS_TYPES } from '../data/statusTypes.js'
 
-// 抽血視為未出席，不計入服務數量
-const PRESENT_STATUSES = ['present', 'respite']
+// 服務天數換算：無紀錄 = 預設出席 1.0 天；各狀態見 statusTypes.js 的 days 欄位
+function serviceDays(status) {
+  if (!status) return 1.0          // 無紀錄 = 預設全天出席
+  return STATUS_TYPES[status]?.days ?? 0
+}
 
 function CaregiverDayModal({ data, onClose, onSelectRecipient }) {
   return (
@@ -97,16 +101,19 @@ export default function StatsView({
       const dayAsgn = dailyAssignments[day.dk] ?? null
 
       CAREGIVERS.forEach(cg => {
-        const list = RECIPIENTS.filter(r => {
-          // ① 誰負責這位長者（今日配對 > 每日配對記錄 > 機構預設主責）
+        let dayCount = 0
+        const list = []
+        RECIPIENTS.forEach(r => {
+          // ① 誰負責這位長者
           const assignedTo = day.isToday
             ? (assignments[r.id] ?? r.primaryCaregiver)
             : (dayAsgn ? (dayAsgn[r.id] ?? r.primaryCaregiver) : r.primaryCaregiver)
-          if (assignedTo !== cg.id) return false
-          // ② 長者當天實際出席（出席/抽血/喘息才算服務）
-          return PRESENT_STATUSES.includes(dayAtt[r.id])
+          if (assignedTo !== cg.id) return
+          // ② 服務天數（含半天 0.5、隱式出席 1.0）
+          const d = serviceDays(dayAtt[r.id])
+          if (d > 0) { dayCount += d; list.push(r) }
         })
-        m[cg.id][day.label] = { count: list.length, recipients: list }
+        m[cg.id][day.label] = { count: dayCount, recipients: list }
       })
     })
     return m
@@ -140,7 +147,9 @@ export default function StatsView({
           </div>
           <div className="text-right">
             <div className="text-xs uppercase tracking-wider" style={{ color: '#8B6F47' }}>合計服務人次</div>
-            <div className="font-display font-bold text-2xl" style={{ color: '#A53838' }}>{grandTotal}</div>
+            <div className="font-display font-bold text-2xl" style={{ color: '#A53838' }}>
+              {Number.isInteger(grandTotal) ? grandTotal : grandTotal.toFixed(1)}
+            </div>
           </div>
         </div>
 
@@ -186,7 +195,7 @@ export default function StatsView({
                           onClick={() => setSelectedCg({ caregiver: cg, day, recipients: cell.recipients })}
                           className="font-display font-semibold text-base hover:underline transition"
                           style={{ color: cell.count >= 8 ? '#A53838' : cell.count === 0 ? '#A09684' : '#5C2828' }}>
-                          {cell.count}
+                          {Number.isInteger(cell.count) ? cell.count : cell.count.toFixed(1)}
                         </button>
                       </td>
                     )

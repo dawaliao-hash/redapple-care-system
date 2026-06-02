@@ -4,6 +4,7 @@ import { useData } from '../context/DataContext.jsx'
 import { fetchAttendanceForMonth } from '../api/index.js'
 import { isOnline } from '../lib/supabase.js'
 import { TW_HOLIDAYS } from '../data/monthlyAttendance.js'
+import { PRESENT_STATUSES as PRESENT_SET, ABSENT_STATUSES as ABSENT_SET } from '../data/statusTypes.js'
 import * as XLSX from 'xlsx'
 
 // ── 報表常數 ─────────────────────────────────────────────
@@ -22,8 +23,9 @@ const INCOME_COLS = [
 ]
 const CMS_LEVELS   = [2, 3, 4, 5, 6, 7, 8]
 const CMS_LABELS   = { 2:'第二級', 3:'第三級', 4:'第四級', 5:'第五級', 6:'第六級', 7:'第七級', 8:'第八級' }
-const PRESENT_STATUSES  = new Set(['present','clinic','hospital','blood','respite'])
-const ABSENT_STATUSES   = new Set(['absent','holiday','rest'])
+// 使用 statusTypes.js 的統一定義（含 am/pm 半天）
+const PRESENT_STATUSES = PRESENT_SET
+const ABSENT_STATUSES  = ABSENT_SET
 
 // 產生期間內所有工作日（週一到週五且非假日）的日期字串
 function getWorkdays(startStr, endStr) {
@@ -284,38 +286,72 @@ export default function ReportView({ monthlyAttendance }) {
 
   const currentReportType = REPORT_TYPES.find(t => t.id === reportType)
 
-  // ── 匯出 Excel ────────────────────────────────────────
+  // ── 匯出 Excel（含合併儲存格）────────────────────────
   const exportExcel = () => {
     const wb = XLSX.utils.book_new()
+    const totalCols = 2 + 4 * (1 + IDENTITY_COLS.length) // 2 + 4*6 = 26
+
+    // ── 資料陣列 ──
     const wsData = []
 
-    // 標題行
-    wsData.push(['雲林縣長期照顧十年計畫（二）－日間照顧', '', reportTitle, '', '單位：人'])
+    // Row 0: 標題
+    wsData.push(['雲林縣長期照顧十年計畫（二）－日間照顧', ...Array(totalCols - 2).fill(''), '單位：人'])
 
-    // 欄位說明行 1
-    const h1 = ['CMS等級', '性別', '總計', '', '', '']
-    IDENTITY_COLS.forEach(id => h1.push(id.label.replace('\n', ''), '', '', ''))
+    // Row 1: 大欄標題（合計+各身份）
+    const h1 = ['CMS等級', '性別', '總　計', '', '', '',
+      ...IDENTITY_COLS.flatMap(id => [id.label.replace(/\n/g, ''), '', '', ''])]
     wsData.push(h1)
 
-    // 欄位說明行 2
+    // Row 2: 小欄標題（合計/低收/中低收/一般戶，重複6次）
     const h2 = ['', '']
-    ;['總計', ...IDENTITY_COLS.map(()=>'')].forEach(() => {
-      INCOME_COLS.forEach(inc => h2.push(inc.label.replace('\n', '')))
-    })
+    for (let g = 0; g < 1 + IDENTITY_COLS.length; g++) {
+      INCOME_COLS.forEach(inc => h2.push(inc.label.replace(/\n/g, '')))
+    }
     wsData.push(h2)
 
-    // 資料行
+    // Rows 3+: 資料行
     tableData.forEach(row => {
-      const cells = [row.cmsLabel, row.genderLabel]
-      row.total.forEach(v => cells.push(v))
-      row.byIdentity.forEach(cols => cols.forEach(v => cells.push(v)))
-      wsData.push(cells)
+      wsData.push([
+        row.cmsLabel, row.genderLabel,
+        ...row.total,
+        ...row.byIdentity.flat(),
+      ])
     })
 
     const ws = XLSX.utils.aoa_to_sheet(wsData)
-    ws['!cols'] = Array(2 + 4 * 6).fill({ wch: 8 })
-    XLSX.utils.book_append_sheet(wb, ws, reportTitle.slice(0, 31))
-    XLSX.writeFile(wb, `日間照顧報表_${reportTitle.replace(/\s/g, '')}.xlsx`)
+
+    // ── 合併儲存格 ──
+    const merges = []
+
+    // 標題列橫跨所有欄
+    merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 2 } })
+
+    // CMS等級、性別 跨兩行
+    merges.push({ s: { r: 1, c: 0 }, e: { r: 2, c: 0 } })
+    merges.push({ s: { r: 1, c: 1 }, e: { r: 2, c: 1 } })
+
+    // 大欄標題（總計 + 5個身份）各跨4欄
+    for (let g = 0; g < 1 + IDENTITY_COLS.length; g++) {
+      const c = 2 + g * 4
+      merges.push({ s: { r: 1, c }, e: { r: 1, c: c + 3 } })
+    }
+
+    // 資料行：CMS等級欄每3行合併一次（24行資料，8組）
+    // 總計：rows 3-5；第二級：rows 6-8；...
+    for (let g = 0; g < 8; g++) {
+      const r = 3 + g * 3
+      merges.push({ s: { r, c: 0 }, e: { r: r + 2, c: 0 } })
+    }
+
+    ws['!merges'] = merges
+
+    // 欄寬
+    ws['!cols'] = [{ wch: 8 }, { wch: 4 }, ...Array(totalCols - 2).fill({ wch: 6 })]
+
+    // 樣式（背景色）— xlsx-js-style 才支援完整樣式，這裡只設欄寬
+    const sheetName = reportTitle.replace(/\s/g, '').slice(0, 31)
+    XLSX.utils.book_append_sheet(wb, ws, sheetName)
+    XLSX.writeFile(wb, `日間照顧報表_${sheetName}.xlsx`)
   }
 
   // ── 列印 PDF ──────────────────────────────────────────
@@ -427,7 +463,7 @@ export default function ReportView({ monthlyAttendance }) {
       {/* ── 報表本體（可列印）── */}
       <div ref={tableRef} className="report-print-area">
         {/* 列印時顯示標題 */}
-        <div className="hidden print:block text-center mb-3">
+        <div className="report-print-title text-center mb-3" style={{ display: 'none' }}>
           <div style={{ fontSize: 16, fontWeight: 700 }}>雲林縣長期照顧十年計畫（二）－日間照顧</div>
           <div style={{ fontSize: 13, marginTop: 4 }}>{reportTitle}　　　　單位：人</div>
         </div>
@@ -497,13 +533,23 @@ export default function ReportView({ monthlyAttendance }) {
         </div>
       </div>
 
-      {/* 列印 CSS */}
+      {/* 列印 CSS — 使用 visibility 確保巢狀元素可正確顯示 */}
       <style>{`
         @media print {
-          body > * { display: none !important; }
-          .report-print-area { display: block !important; }
-          nav, header, .print\\:hidden { display: none !important; }
-          table { page-break-inside: auto; font-size: 9px; }
+          body * { visibility: hidden !important; }
+          .report-print-area,
+          .report-print-area * { visibility: visible !important; }
+          .report-print-area {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%;
+            background: white;
+            padding: 8mm;
+            box-sizing: border-box;
+          }
+          .report-print-title { display: block !important; }
+          table { font-size: 8px; border-collapse: collapse; }
+          th, td { border: 1px solid #999; padding: 2px 3px; }
           tr { page-break-inside: avoid; }
         }
       `}</style>
