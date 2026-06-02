@@ -44,38 +44,40 @@ function getWorkdays(startStr, endStr) {
 }
 
 // 找出在某期間「有出席」的個案 ID 集合
-// 邏輯：只要有任一工作日狀態為出席（或沒有設定過，視為出席），就算在內
+// 規則（和月度點名一致）：
+//   - 有明確 present/clinic/hospital/blood/respite → 出席
+//   - 有明確 absent/rest/holiday → 缺席
+//   - 完全沒記錄的工作日 → 視為出席（app 慣例：未標記 = 出席）
+// 但若整個期間對所有長者都沒有任何記錄，回傳空集合（資料尚未建立）
 function getAttendedIds(attendance, startStr, endStr, allRecipientIds) {
   const workdays = getWorkdays(startStr, endStr)
   if (!workdays.length) return new Set()
 
+  // 檢查期間內是否有任何出缺席記錄
+  const hasAnyRecord = workdays.some(date =>
+    attendance[date] && Object.keys(attendance[date]).length > 0
+  )
+
+  // 若完全沒有記錄（此月份未使用系統）→ 無法判斷，回傳空集合
+  if (!hasAnyRecord) return new Set()
+
+  // 有記錄：對每位長者判斷是否出席過
   const ids = new Set()
-
-  // 先看明確記錄為出席的
-  workdays.forEach(date => {
-    const dayData = attendance[date] ?? {}
-    Object.entries(dayData).forEach(([rid, status]) => {
-      if (PRESENT_STATUSES.has(status)) ids.add(rid)
-    })
-  })
-
-  // 再補：對每個長者，若在整個期間內「沒有任何缺席記錄」且「至少有一天有記錄」
-  // → 視為有出席（例如：當月只有標記特殊狀況，其餘預設出席）
   allRecipientIds.forEach(rid => {
-    if (ids.has(rid)) return
-    let hasAnyRecord = false
-    let allAbsent = true
-    workdays.forEach(date => {
+    for (const date of workdays) {
       const status = (attendance[date] ?? {})[rid]
-      if (status) {
-        hasAnyRecord = true
-        if (!ABSENT_STATUSES.has(status)) allAbsent = false
+      if (!status) {
+        // 沒有記錄的工作日 = 預設出席
+        ids.add(rid)
+        return
       }
-    })
-    // 有記錄，且不是全部缺席 → 已在 ids 中（handled above）
-    // 有記錄，且全部缺席 → 不算
-    // 完全沒記錄（期間從未被標記）→ 無法確定，不算（避免誤計未開案個案）
-    // 但若「至少一天有明確記錄且非缺席」已在上面加入
+      if (PRESENT_STATUSES.has(status)) {
+        ids.add(rid)
+        return
+      }
+      // status 是 absent/rest/holiday → 繼續看下一天
+    }
+    // 所有工作日都明確缺席 → 不算
   })
 
   return ids
