@@ -66,12 +66,12 @@ function normalizeDisabilities(d) {
   }
 }
 
-function RecipientModal({ initial, caregivers, onSave, onClose }) {
+function RecipientModal({ initial, caregivers, allRecipients, onSave, onClose }) {
   const isNew = !initial?.id
   const [form, setForm] = useState(() => {
     if (!initial) return {
       id: `r${Date.now()}`, code: '', name: '', gender: '女', age: '',
-      cms: 5, primaryCaregiver: caregivers[0]?.id ?? '',
+      cms: 5, primaryCaregiver: '',   // 預設未選擇
       conditions: [], emergencyContact: '', phone: '', address: '',
       bathDays: [], notes: '', level: '第三類',
       disabilities: { categories: [], level: '輕度' },
@@ -210,10 +210,57 @@ function RecipientModal({ initial, caregivers, onSave, onClose }) {
             </div>
           </Field>
           <Field label="主責照服員">
-            <select className={inputCls} style={inputSt} value={form.primaryCaregiver}
-              onChange={e => set('primaryCaregiver', e.target.value)}>
-              {caregivers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <div className="space-y-2">
+              {/* 未選擇選項 */}
+              <label className="flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition hover:bg-orange-50"
+                style={{ borderColor: form.primaryCaregiver === '' ? '#A53838' : '#C4A87A',
+                         background: form.primaryCaregiver === '' ? '#FBE8DC' : '#FBF6EC' }}>
+                <input type="radio" name="caregiver" value=""
+                  checked={form.primaryCaregiver === ''}
+                  onChange={() => set('primaryCaregiver', '')}
+                  style={{ accentColor: '#A53838' }} />
+                <span className="text-sm italic" style={{ color: '#A09684' }}>（目前沒有照服員）</span>
+              </label>
+              {/* 各照服員選項 */}
+              {caregivers.map(c => {
+                const MAX = 8
+                // 計算此照服員目前的負責人數（排除正在編輯的這位長者本人）
+                const load = (allRecipients ?? []).filter(r =>
+                  r.primaryCaregiver === c.id && r.id !== form.id && r.isActive !== false
+                ).length
+                const isFull    = load >= MAX
+                const isSelected = form.primaryCaregiver === c.id
+                return (
+                  <label key={c.id}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg border transition ${isFull && !isSelected ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-orange-50'}`}
+                    style={{ borderColor: isSelected ? '#A53838' : '#C4A87A',
+                             background: isSelected ? '#FBE8DC' : '#FBF6EC' }}>
+                    <input type="radio" name="caregiver" value={c.id}
+                      checked={isSelected}
+                      disabled={isFull && !isSelected}
+                      onChange={() => !isFull && set('primaryCaregiver', c.id)}
+                      style={{ accentColor: '#A53838' }} />
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                      style={{ background: c.color }}>{c.avatar}</div>
+                    <span className="text-sm font-medium flex-1" style={{ color: '#5C2828' }}>{c.name}</span>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: '#EAE0CC' }}>
+                        <div className="h-full rounded-full"
+                          style={{ width: `${Math.min(load / MAX * 100, 100)}%`,
+                                   background: isFull ? '#A53838' : '#7A9474' }} />
+                      </div>
+                      <span className="text-xs font-medium" style={{ color: isFull ? '#A53838' : '#8B6F47' }}>
+                        {load}/{MAX}
+                      </span>
+                      {isFull && !isSelected && (
+                        <span className="text-xs px-1.5 py-0.5 rounded font-semibold"
+                          style={{ background: '#A53838', color: 'white' }}>已額滿</span>
+                      )}
+                    </div>
+                  </label>
+                )
+              })}
+            </div>
           </Field>
           <Field label="洗澡日">
             <div className="flex gap-1">
@@ -939,6 +986,7 @@ export default function AdminView() {
         <RecipientModal
           initial={editRecipient.id ? editRecipient : null}
           caregivers={caregivers}
+          allRecipients={recipients}
           onSave={(r) => {
             editRecipient.id ? updateRecipient(r) : addRecipient(r)
             setEditRecipient(null)
