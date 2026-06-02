@@ -1,6 +1,9 @@
-import { useState, useMemo, useRef } from 'react'
-import { ChevronLeft, ChevronRight, Printer, FileSpreadsheet } from 'lucide-react'
+import { useState, useMemo, useRef, useEffect } from 'react'
+import { ChevronLeft, ChevronRight, Printer, FileSpreadsheet, RefreshCw } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
+import { fetchAttendanceForMonth } from '../api/index.js'
+import { isOnline } from '../lib/supabase.js'
+import { TW_HOLIDAYS } from '../data/monthlyAttendance.js'
 import * as XLSX from 'xlsx'
 
 // ── 報表常數 ─────────────────────────────────────────────
@@ -19,18 +22,62 @@ const INCOME_COLS = [
 ]
 const CMS_LEVELS   = [2, 3, 4, 5, 6, 7, 8]
 const CMS_LABELS   = { 2:'第二級', 3:'第三級', 4:'第四級', 5:'第五級', 6:'第六級', 7:'第七級', 8:'第八級' }
-const PRESENT_STATUSES = new Set(['present','clinic','hospital','blood','respite'])
+const PRESENT_STATUSES  = new Set(['present','clinic','hospital','blood','respite'])
+const ABSENT_STATUSES   = new Set(['absent','holiday','rest'])
 
-// 出缺席資料中找到在某期間有出席的個案 ID 集合
-function getAttendedIds(monthlyAttendance, startStr, endStr) {
-  const ids = new Set()
-  Object.entries(monthlyAttendance).forEach(([date, dayData]) => {
-    if (date >= startStr && date <= endStr) {
-      Object.entries(dayData).forEach(([rid, status]) => {
-        if (PRESENT_STATUSES.has(status)) ids.add(rid)
-      })
+// 產生期間內所有工作日（週一到週五且非假日）的日期字串
+function getWorkdays(startStr, endStr) {
+  const days = []
+  const [sy, sm, sd] = startStr.split('/').map(Number)
+  const [ey, em, ed] = endStr.split('/').map(Number)
+  const cur = new Date(sy, sm - 1, sd)
+  const end = new Date(ey, em - 1, ed)
+  while (cur <= end) {
+    const dow = cur.getDay()
+    if (dow !== 0 && dow !== 6) {
+      const dk = `${cur.getFullYear()}/${String(cur.getMonth()+1).padStart(2,'0')}/${String(cur.getDate()).padStart(2,'0')}`
+      if (!TW_HOLIDAYS[dk]) days.push(dk)
     }
+    cur.setDate(cur.getDate() + 1)
+  }
+  return days
+}
+
+// 找出在某期間「有出席」的個案 ID 集合
+// 邏輯：只要有任一工作日狀態為出席（或沒有設定過，視為出席），就算在內
+function getAttendedIds(attendance, startStr, endStr, allRecipientIds) {
+  const workdays = getWorkdays(startStr, endStr)
+  if (!workdays.length) return new Set()
+
+  const ids = new Set()
+
+  // 先看明確記錄為出席的
+  workdays.forEach(date => {
+    const dayData = attendance[date] ?? {}
+    Object.entries(dayData).forEach(([rid, status]) => {
+      if (PRESENT_STATUSES.has(status)) ids.add(rid)
+    })
   })
+
+  // 再補：對每個長者，若在整個期間內「沒有任何缺席記錄」且「至少有一天有記錄」
+  // → 視為有出席（例如：當月只有標記特殊狀況，其餘預設出席）
+  allRecipientIds.forEach(rid => {
+    if (ids.has(rid)) return
+    let hasAnyRecord = false
+    let allAbsent = true
+    workdays.forEach(date => {
+      const status = (attendance[date] ?? {})[rid]
+      if (status) {
+        hasAnyRecord = true
+        if (!ABSENT_STATUSES.has(status)) allAbsent = false
+      }
+    })
+    // 有記錄，且不是全部缺席 → 已在 ids 中（handled above）
+    // 有記錄，且全部缺席 → 不算
+    // 完全沒記錄（期間從未被標記）→ 無法確定，不算（避免誤計未開案個案）
+    // 但若「至少一天有明確記錄且非缺席」已在上面加入
+  })
+
   return ids
 }
 
@@ -102,18 +149,71 @@ export default function ReportView({ monthlyAttendance }) {
   const [half,  setHalf]  = useState(1) // 1=上半年, 2=下半年
   const tableRef = useRef(null)
 
+  // ── 自動抓取缺少的月份資料 ────────────────────────────
+  const [extraAttendance, setExtraAttendance] = useState({})
+  const fetchedKeys = useRef(new Set())
+  const [fetching, setFetching] = useState(false)
+
+  // 所有資料來源：prop（App 管理的）+ 本地抓取的額外資料
+  const combinedAttendance = useMemo(() =>
+    ({ ...monthlyAttendance, ...extraAttendance }),
+    [monthlyAttendance, extraAttendance])
+
+  // 計算當前報表類型需要哪些月份
+  const neededMonths = useMemo(() => {
+    const months = []
+    switch (reportType) {
+      case 'monthly':     months.push({ y: year, m: month }); break
+      case 'semi_end':
+      case 'semi_period': {
+        const s = half === 1 ? 1 : 7, e = half === 1 ? 6 : 12
+        for (let m = s; m <= e; m++) months.push({ y: year, m })
+        break
+      }
+      case 'annual_12':   months.push({ y: year, m: 12 }); break
+      case 'annual_7_12': for (let m = 7; m <= 12; m++) months.push({ y: year, m }); break
+      case 'annual_1_12': for (let m = 1; m <= 12; m++) months.push({ y: year, m }); break
+    }
+    return months
+  }, [reportType, year, month, half])
+
+  // 若有缺少的月份，自動從 Supabase 抓取
+  useEffect(() => {
+    if (!isOnline) return
+    const prefix = (y, m) => `${y}/${String(m).padStart(2,'0')}`
+    const missing = neededMonths.filter(({ y, m }) => {
+      const key = prefix(y, m)
+      if (fetchedKeys.current.has(key)) return false
+      return !Object.keys(combinedAttendance).some(d => d.startsWith(key))
+    })
+    if (!missing.length) return
+
+    setFetching(true)
+    Promise.all(missing.map(({ y, m }) => {
+      const key = prefix(y, m)
+      fetchedKeys.current.add(key)
+      return fetchAttendanceForMonth(y, m)
+    })).then(results => {
+      const merged = Object.assign({}, ...results)
+      if (Object.keys(merged).length) {
+        setExtraAttendance(prev => ({ ...prev, ...merged }))
+      }
+      setFetching(false)
+    }).catch(() => setFetching(false))
+  }, [neededMonths])
+
+  const allRids = useMemo(() => allRecipients.map(r => r.id), [allRecipients])
+
   // ── 決定統計母體 ──────────────────────────────────────
   const pool = useMemo(() => {
     switch (reportType) {
       case 'monthly': {
-        // 當月有出席≥1天
         const start = fmt(year, month, 1)
         const end   = fmt(year, month, lastDay(year, month))
-        const ids   = getAttendedIds(monthlyAttendance, start, end)
+        const ids   = getAttendedIds(combinedAttendance, start, end, allRids)
         return allRecipients.filter(r => ids.has(r.id))
       }
       case 'semi_end': {
-        // 指定月底在案（month = 6 or 12，由 half 決定）
         const endMonth = half === 1 ? 6 : 12
         const endStr   = fmt(year, endMonth, lastDay(year, endMonth))
         return getPeriodEndPool(allRecipients, endStr)
@@ -123,7 +223,7 @@ export default function ReportView({ monthlyAttendance }) {
         const endMonth   = half === 1 ? 6 : 12
         const start = fmt(year, startMonth, 1)
         const end   = fmt(year, endMonth, lastDay(year, endMonth))
-        const ids   = getAttendedIds(monthlyAttendance, start, end)
+        const ids   = getAttendedIds(combinedAttendance, start, end, allRids)
         return allRecipients.filter(r => ids.has(r.id))
       }
       case 'annual_12': {
@@ -133,18 +233,18 @@ export default function ReportView({ monthlyAttendance }) {
       case 'annual_7_12': {
         const start = fmt(year, 7, 1)
         const end   = fmt(year, 12, 31)
-        const ids   = getAttendedIds(monthlyAttendance, start, end)
+        const ids   = getAttendedIds(combinedAttendance, start, end, allRids)
         return allRecipients.filter(r => ids.has(r.id))
       }
       case 'annual_1_12': {
         const start = fmt(year, 1, 1)
         const end   = fmt(year, 12, 31)
-        const ids   = getAttendedIds(monthlyAttendance, start, end)
+        const ids   = getAttendedIds(combinedAttendance, start, end, allRids)
         return allRecipients.filter(r => ids.has(r.id))
       }
       default: return []
     }
-  }, [reportType, year, month, half, allRecipients, monthlyAttendance])
+  }, [reportType, year, month, half, allRecipients, combinedAttendance, allRids])
 
   const tableData = useMemo(() => buildTable(pool), [pool])
 
@@ -267,7 +367,12 @@ export default function ReportView({ monthlyAttendance }) {
         )}
 
         {/* 匯出按鈕 */}
-        <div className="flex gap-2 ml-auto">
+        <div className="flex gap-2 ml-auto items-center">
+          {fetching && (
+            <span className="flex items-center gap-1 text-xs" style={{ color: '#8B6F47' }}>
+              <RefreshCw size={13} className="animate-spin"/> 載入資料中…
+            </span>
+          )}
           <button onClick={printPDF}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition hover:bg-orange-50 print:hidden"
             style={{ borderColor: '#C4A87A', color: '#5C3A1E' }}>
