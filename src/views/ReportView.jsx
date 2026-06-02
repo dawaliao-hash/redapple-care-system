@@ -53,9 +53,13 @@ function getAttendedIds(attendance, startStr, endStr, allRecipientIds) {
   const workdays = getWorkdays(startStr, endStr)
   if (!workdays.length) return new Set()
 
-  // 檢查期間內是否有任何出缺席記錄
-  const hasAnyRecord = workdays.some(date =>
-    attendance[date] && Object.keys(attendance[date]).length > 0
+  // 檢查整個期間（含假日）是否有任何出缺席記錄
+  // 使用寬鬆檢查：只要有任一日期有任一長者有記錄，就視為「有使用系統」
+  const allDatesInPeriod = Object.keys(attendance).filter(
+    d => d >= startStr && d <= endStr
+  )
+  const hasAnyRecord = allDatesInPeriod.some(
+    date => Object.keys(attendance[date] ?? {}).length > 0
   )
 
   // 若完全沒有記錄（此月份未使用系統）→ 無法判斷，回傳空集合
@@ -179,27 +183,24 @@ export default function ReportView({ monthlyAttendance }) {
     return months
   }, [reportType, year, month, half])
 
-  // 若有缺少的月份，自動從 Supabase 抓取
+  // 切換期間時，一律從 Supabase 抓取最新資料（每個月只抓一次）
+  // 注意：不依賴本地 combinedAttendance 判斷是否已有資料，
+  //       因為 monthlyAttendance 可能只有假日標記，工作日出席資料仍需從 Supabase 取
   useEffect(() => {
     if (!isOnline) return
     const prefix = (y, m) => `${y}/${String(m).padStart(2,'0')}`
-    const missing = neededMonths.filter(({ y, m }) => {
-      const key = prefix(y, m)
-      if (fetchedKeys.current.has(key)) return false
-      return !Object.keys(combinedAttendance).some(d => d.startsWith(key))
-    })
+    const missing = neededMonths.filter(({ y, m }) =>
+      !fetchedKeys.current.has(prefix(y, m))
+    )
     if (!missing.length) return
 
     setFetching(true)
     Promise.all(missing.map(({ y, m }) => {
-      const key = prefix(y, m)
-      fetchedKeys.current.add(key)
+      fetchedKeys.current.add(prefix(y, m))
       return fetchAttendanceForMonth(y, m)
     })).then(results => {
       const merged = Object.assign({}, ...results)
-      if (Object.keys(merged).length) {
-        setExtraAttendance(prev => ({ ...prev, ...merged }))
-      }
+      setExtraAttendance(prev => ({ ...prev, ...merged }))
       setFetching(false)
     }).catch(() => setFetching(false))
   }, [neededMonths])
