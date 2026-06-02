@@ -44,34 +44,22 @@ function getWorkdays(startStr, endStr) {
 }
 
 // 找出在某期間「有出席」的個案 ID 集合
-// 規則（和月度點名一致）：
-//   - 有明確 present/clinic/hospital/blood/respite → 出席
-//   - 有明確 absent/rest/holiday → 缺席
-//   - 完全沒記錄的工作日 → 視為出席（app 慣例：未標記 = 出席）
-// 但若整個期間對所有長者都沒有任何記錄，回傳空集合（資料尚未建立）
+// 規則（與月度點名顯示邏輯一致）：
+//   - 工作日有明確 present / clinic / hospital / blood / respite → 出席
+//   - 工作日「沒有任何紀錄」→ 視為出席（app 預設：未標記 = 出席）
+//   - 工作日有明確 absent / rest / holiday → 缺席
+//   只要在期間內任一工作日「算出席」，該長者就納入統計
+//   若某長者的所有工作日都是明確缺席狀態，才不計入
 function getAttendedIds(attendance, startStr, endStr, allRecipientIds) {
   const workdays = getWorkdays(startStr, endStr)
   if (!workdays.length) return new Set()
 
-  // 檢查整個期間（含假日）是否有任何出缺席記錄
-  // 使用寬鬆檢查：只要有任一日期有任一長者有記錄，就視為「有使用系統」
-  const allDatesInPeriod = Object.keys(attendance).filter(
-    d => d >= startStr && d <= endStr
-  )
-  const hasAnyRecord = allDatesInPeriod.some(
-    date => Object.keys(attendance[date] ?? {}).length > 0
-  )
-
-  // 若完全沒有記錄（此月份未使用系統）→ 無法判斷，回傳空集合
-  if (!hasAnyRecord) return new Set()
-
-  // 有記錄：對每位長者判斷是否出席過
   const ids = new Set()
   allRecipientIds.forEach(rid => {
     for (const date of workdays) {
       const status = (attendance[date] ?? {})[rid]
       if (!status) {
-        // 沒有記錄的工作日 = 預設出席
+        // 無紀錄工作日 = 預設出席 → 直接算進去，不需再看其他天
         ids.add(rid)
         return
       }
@@ -79,9 +67,9 @@ function getAttendedIds(attendance, startStr, endStr, allRecipientIds) {
         ids.add(rid)
         return
       }
-      // status 是 absent/rest/holiday → 繼續看下一天
+      // 明確缺席（absent/rest/holiday）→ 繼續看下一個工作日
     }
-    // 所有工作日都明確缺席 → 不算
+    // 所有工作日都明確缺席 → 不計入
   })
 
   return ids
@@ -136,12 +124,41 @@ function buildTable(pool) {
 
 // ── 報表類型 ─────────────────────────────────────────────
 const REPORT_TYPES = [
-  { id: 'monthly',     label: '月報',          desc: '當月有出席≥1天' },
-  { id: 'semi_end',    label: '半年報（期底）', desc: '指定月底在案' },
-  { id: 'semi_period', label: '半年報（本期）', desc: '半年內有出席≥1天' },
-  { id: 'annual_12',   label: '全年報（12月）', desc: '12月在案' },
-  { id: 'annual_7_12', label: '全年報（7-12月）',desc: '下半年有出席≥1天' },
-  { id: 'annual_1_12', label: '全年報（全年）', desc: '全年有出席≥1天' },
+  {
+    id: 'monthly', label: '月報', desc: '當月有出席≥1天',
+    note: '統計當月（1日至月底）期間，至少有一天出席的個案人數。\n' +
+          '月度點名中未標記的工作日預設為出席，明確標記「缺席 / 休假 / 假日」的工作日才算缺席。\n' +
+          '若某人全月所有工作日均為明確缺席，則不計入。',
+  },
+  {
+    id: 'semi_end', label: '半年報（期底）', desc: '指定月底在案',
+    note: '統計 6月底（上半年）或 12月底（下半年）當日仍在案的個案人數。\n' +
+          '不看出席紀錄，只看個案是否在案（未結案，或結案日期在期底之後）。\n' +
+          '這是政府「期底服務個案人數」表格的計算基準。',
+  },
+  {
+    id: 'semi_period', label: '半年報（本期）', desc: '半年內有出席≥1天',
+    note: '統計上半年（1-6月）或下半年（7-12月）期間，至少有一天出席的個案人數。\n' +
+          '含已結案個案（結案前若曾出席亦計入）。\n' +
+          '做法：以 6月底的身份 / 等級為基準，7月後變更不影響。',
+  },
+  {
+    id: 'annual_12', label: '全年報（12月）', desc: '12月在案',
+    note: '統計 12月底當日仍在案的個案人數（同半年報期底邏輯，以 12月 31日為基準日）。\n' +
+          '不看出席紀錄，只看個案當日是否在案。',
+  },
+  {
+    id: 'annual_7_12', label: '全年報（7-12月）', desc: '下半年有出席≥1天',
+    note: '統計 7月至 12月期間，至少有一天出席的個案人數。\n' +
+          '身份 / 等級以上半年決定的資料為準（不因下半年變更而修改）。\n' +
+          '算法：全年（1-12月）名單 扣除 上半年已結案個案，即得下半年名單。',
+  },
+  {
+    id: 'annual_1_12', label: '全年報（全年）', desc: '全年有出席≥1天',
+    note: '統計全年（1月至 12月）期間，至少有一天出席的個案人數。\n' +
+          '做法：先複製上半年（1-6月）名單，再加入 7-12月新增的個案，合計即全年名單。\n' +
+          '同一個人不重複計算。',
+  },
 ]
 
 // ════════════════════════════════════════════════════════
@@ -264,6 +281,8 @@ export default function ReportView({ monthlyAttendance }) {
       default: return ''
     }
   }, [reportType, year, month, half])
+
+  const currentReportType = REPORT_TYPES.find(t => t.id === reportType)
 
   // ── 匯出 Excel ────────────────────────────────────────
   const exportExcel = () => {
@@ -389,11 +408,20 @@ export default function ReportView({ monthlyAttendance }) {
         </div>
       </div>
 
-      {/* ── 統計摘要 ── */}
-      <div className="flex items-center gap-3 px-1 text-sm print:hidden" style={{ color: '#8B6F47' }}>
-        <span>統計人數：<strong style={{ color: '#A53838' }}>{pool.length}</strong> 人</span>
-        <span>·</span>
-        <span>期間：{reportTitle}</span>
+      {/* ── 統計摘要 + 報表邏輯說明 ── */}
+      <div className="space-y-2 print:hidden">
+        <div className="flex items-center gap-3 px-1 text-sm" style={{ color: '#8B6F47' }}>
+          <span>統計人數：<strong style={{ color: '#A53838' }}>{pool.length}</strong> 人</span>
+          <span>·</span>
+          <span>期間：{reportTitle}</span>
+        </div>
+        {currentReportType?.note && (
+          <div className="rounded-xl px-4 py-3 border text-xs leading-relaxed whitespace-pre-line"
+            style={{ background: '#FBF6EC', borderColor: '#E5D5B7', color: '#5C3A1E' }}>
+            <span className="font-semibold" style={{ color: '#8B6F47' }}>📋 計算邏輯：</span>
+            {'  '}{currentReportType.note}
+          </div>
+        )}
       </div>
 
       {/* ── 報表本體（可列印）── */}
