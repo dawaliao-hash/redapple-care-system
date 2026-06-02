@@ -533,8 +533,12 @@ export default function ReportView({ monthlyAttendance }) {
         </div>
       </div>
 
-      {/* 列印 CSS — 使用 visibility 確保巢狀元素可正確顯示 */}
+      {/* 列印 CSS — A4 橫向，確保整張報表一頁顯示 */}
       <style>{`
+        @page {
+          size: A4 landscape;
+          margin: 6mm;
+        }
         @media print {
           body * { visibility: hidden !important; }
           .report-print-area,
@@ -544,12 +548,21 @@ export default function ReportView({ monthlyAttendance }) {
             top: 0; left: 0;
             width: 100%;
             background: white;
-            padding: 8mm;
-            box-sizing: border-box;
           }
           .report-print-title { display: block !important; }
-          table { font-size: 8px; border-collapse: collapse; }
-          th, td { border: 1px solid #999; padding: 2px 3px; }
+          .report-print-area > div { border: none !important; border-radius: 0 !important; }
+          .report-print-area .overflow-x-auto { overflow: visible !important; }
+          table {
+            font-size: 6.5px;
+            border-collapse: collapse;
+            width: 100%;
+            table-layout: fixed;
+          }
+          th, td {
+            border: 0.5px solid #888;
+            padding: 1.5px 2px;
+            word-break: break-all;
+          }
           tr { page-break-inside: avoid; }
         }
       `}</style>

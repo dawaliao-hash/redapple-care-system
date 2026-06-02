@@ -7,6 +7,8 @@ import { formatDisplayDate } from '../data/monthlyAttendance.js'
 // 月度表用的短符號（含假日）
 const SHORT = {
   present:  { label: '✓', bg: '#DFF0E0', text: '#2E6E3E' },
+  am:       { label: '上', bg: '#E4F2E4', text: '#2D6B2D' },  // 上午半天
+  pm:       { label: '下', bg: '#E0EDF8', text: '#1A4D6B' },  // 下午半天
   rest:     { label: '休', bg: '#F5E6D3', text: '#A0541E' },
   hospital: { label: '住', bg: '#F0D5D0', text: '#8B2C20' },
   clinic:   { label: '診', bg: '#D8E2EA', text: '#2D4F6A' },
@@ -17,8 +19,8 @@ const SHORT = {
 }
 
 // 狀態循環：假日日期從 holiday 開始，一般日從 present 開始
-const STATUS_CYCLE      = ['present', 'rest', 'hospital', 'clinic', 'blood', 'respite', 'holiday', 'absent', '']
-const STATUS_CYCLE_HOLI = ['holiday', 'present', 'rest', 'hospital', 'clinic', 'blood', 'respite', 'absent', '']
+const STATUS_CYCLE      = ['present', 'am', 'pm', 'rest', 'hospital', 'clinic', 'blood', 'respite', 'holiday', 'absent', '']
+const STATUS_CYCLE_HOLI = ['holiday', 'present', 'am', 'pm', 'rest', 'hospital', 'clinic', 'blood', 'respite', 'absent', '']
 
 const WD = ['日','一','二','三','四','五','六']
 
@@ -125,34 +127,46 @@ export default function MonthlyView({
     }))
   }
 
-  // 判斷「實際出席」：未設定 + 過去/今天 + 非假日 → 視同出席（與今日點名一致）
-  const isActuallyPresent = useCallback((date, recipientId) => {
+  // 計算某長者某日的出席天數（1.0=全天, 0.5=半天, 0=缺席）
+  const getDayValue = useCallback((date, recipientId) => {
     const status = monthlyAttendance[date]?.[recipientId]
     const holi   = holidays[date]
     const d      = new Date(date.replace(/\//g, '-'))
     d.setHours(0, 0, 0, 0)
     const isFuture = d > today
-    return status === 'present' || (!status && !holi && !isFuture)
+    if (!status) {
+      // 未設定：過去/今天非假日 → 視同全天出席
+      return (!holi && !isFuture) ? 1.0 : 0
+    }
+    return STATUS_TYPES[status]?.days ?? 0
   }, [monthlyAttendance, holidays, today])
 
-  // 每位長者本月出席天數
+  // 判斷「實際出席」（出席天數 > 0 即算有出席）
+  const isActuallyPresent = useCallback((date, recipientId) =>
+    getDayValue(date, recipientId) > 0,
+  [getDayValue])
+
+  // 每位長者本月出席天數（含半天計 0.5）
   const recipientTotals = useMemo(() => {
     const t = {}
     RECIPIENTS.forEach(r => {
-      t[r.id] = workDays.filter(d => isActuallyPresent(formatDisplayDate(d), r.id)).length
+      const total = workDays.reduce((sum, d) =>
+        sum + getDayValue(formatDisplayDate(d), r.id), 0)
+      t[r.id] = Number.isInteger(total) ? total : total.toFixed(1)
     })
     return t
-  }, [monthlyAttendance, workDays, RECIPIENTS, isActuallyPresent])
+  }, [monthlyAttendance, workDays, RECIPIENTS, getDayValue])
 
-  // 每日在場人數
+  // 每日在場人數（半天算 0.5 人次）
   const dayTotals = useMemo(() => {
     const t = {}
     workDays.forEach(d => {
       const dk = formatDisplayDate(d)
-      t[dk] = RECIPIENTS.filter(r => isActuallyPresent(dk, r.id)).length
+      const cnt = RECIPIENTS.reduce((sum, r) => sum + getDayValue(dk, r.id), 0)
+      t[dk] = Number.isInteger(cnt) ? cnt : cnt.toFixed(1)
     })
     return t
-  }, [monthlyAttendance, workDays, RECIPIENTS, isActuallyPresent])
+  }, [monthlyAttendance, workDays, RECIPIENTS, getDayValue])
 
   // 一鍵全員出席：將本月所有未設定的過去/今天工作日設為 present
   const markAllPresent = useCallback(() => {

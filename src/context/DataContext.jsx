@@ -38,13 +38,26 @@ export function DataProvider({ children }) {
     }).catch(console.error)
   }, [])
 
-  // 初始載入
+  // 初始載入：從 Supabase 拉取，並保留本地尚未同步的新增項目
   useEffect(() => {
     if (!isOnline) { setLoading(false); return }
     Promise.all([fetchRecipients(), fetchCaregivers()]).then(([r, c]) => {
-      setRecipients(r); setLocalR(r)
-      setCaregivers(c); setLocalC(c)
+      // 找出本地有、Supabase 沒有的項目（剛新增但 Supabase 尚未存到的）
+      const supabaseRIds = new Set(r.map(x => x.id))
+      const supabaseCIds = new Set(c.map(x => x.id))
+      const localOnlyR = safeR.filter(x => !supabaseRIds.has(x.id))
+      const localOnlyC = safeC.filter(x => !supabaseCIds.has(x.id))
+
+      const mergedR = [...r, ...localOnlyR]
+      const mergedC = [...c, ...localOnlyC]
+
+      setRecipients(mergedR); setLocalR(mergedR)
+      setCaregivers(mergedC); setLocalC(mergedC)
       setLoading(false)
+
+      // 嘗試把本地新增的重新同步到 Supabase（背景執行，不阻擋 UI）
+      localOnlyR.forEach(x => upsertRecipient(x).catch(console.error))
+      localOnlyC.forEach(x => upsertCaregiver(x).catch(console.error))
     }).catch(() => setLoading(false))
   }, [])
 

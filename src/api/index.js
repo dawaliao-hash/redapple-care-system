@@ -86,6 +86,16 @@ const hrFromRow = (row) => ({
   recorder: row.recorder,
 })
 
+// 僅含原始欄位（不含 005/006 migration 新增的欄位）
+// 若 Supabase 尚未執行 migration，以此備援
+const toRowBase = (r) => ({
+  id: r.id, code: r.code, name: r.name, gender: r.gender, age: r.age,
+  cms: r.cms, primary_caregiver: r.primaryCaregiver,
+  conditions: r.conditions ?? [], emergency_contact: r.emergencyContact,
+  phone: r.phone, address: r.address,
+  bath_days: r.bathDays ?? [], notes: r.notes, level: r.level,
+})
+
 // ════════════════════════════════════════════════════════════
 // RECIPIENTS
 // ════════════════════════════════════════════════════════════
@@ -100,13 +110,38 @@ export async function fetchRecipients() {
 
 export async function upsertRecipient(r) {
   if (!isOnline) return r
+
+  // 先嘗試完整欄位（含 005/006 migration 新增的欄位）
   const { data, error } = await supabase
     .from('recipients')
     .upsert(toRow(r), { onConflict: 'id' })
     .select()
     .single()
-  if (error) throw error
-  return fromRow(data)
+
+  if (!error) return fromRow(data)
+
+  // 若因欄位不存在而失敗（migration 尚未執行），降級為基礎欄位重試
+  const isColError = error.code === '42703' || error.message?.includes('column')
+  if (isColError) {
+    console.warn('[API] New columns not in Supabase yet, retrying with base columns')
+    const { data: d2, error: e2 } = await supabase
+      .from('recipients')
+      .upsert(toRowBase(r), { onConflict: 'id' })
+      .select()
+      .single()
+    if (e2) throw e2
+    // 將本地額外欄位合併回傳，確保 UI 不遺失資料
+    return {
+      ...fromRow(d2),
+      disabilities:    r.disabilities    ?? { categories: [], level: '輕度' },
+      serviceCategory: r.serviceCategory ?? 'elderly',
+      isActive:        r.isActive !== false,
+      closedAt:        r.closedAt        ?? null,
+      closeReason:     r.closeReason     ?? '',
+    }
+  }
+
+  throw error
 }
 
 export async function deleteRecipient(id) {
