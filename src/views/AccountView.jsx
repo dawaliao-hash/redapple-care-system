@@ -269,7 +269,7 @@ ON CONFLICT (id) DO NOTHING;`}
 export default function AccountView({ user }) {
   const userDisplay = user?.user_metadata?.display_name || user?.email?.split('@')[0] || '使用者'
   // 管理員判斷：已設定 role='admin' 的帳號，或在 SQL 執行前以 email 暫時辨識
-  const ADMIN_EMAILS = ['amuy.chen@gmail.com']
+  const ADMIN_EMAILS = ['amuy.chen@gmail.com', 'dawadorge@gmail.com']
   const isAdmin = user?.user_metadata?.role === 'admin' || ADMIN_EMAILS.includes(user?.email)
 
   return (

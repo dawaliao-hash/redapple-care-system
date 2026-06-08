@@ -340,9 +340,13 @@ function AuthGate() {
   }, [])
 
   // 登入後檢查帳號審核狀態
+  // SQL 執行前的 email 備援清單：這些帳號一律視為管理員
+  const ADMIN_EMAILS = ['amuy.chen@gmail.com', 'dawadorge@gmail.com']
   useEffect(() => {
     if (!user) { setApprovalStatus(null); return }
-    if (user.user_metadata?.role === 'admin') { setApprovalStatus('admin'); return }
+    if (user.user_metadata?.role === 'admin' || ADMIN_EMAILS.includes(user.email)) {
+      setApprovalStatus('admin'); return
+    }
     checkApprovalStatus(user.id).then(setApprovalStatus)
   }, [user])
 

@@ -328,9 +328,14 @@ export async function checkApprovalStatus(userId) {
 }
 
 export async function registerApprovalRequest(userId, email) {
-  if (!isOnline) return
-  await supabase.from('user_approvals')
+  if (!isOnline) return { ok: false, error: '離線模式' }
+  const { error } = await supabase.from('user_approvals')
     .upsert({ id: userId, email, status: 'pending' }, { onConflict: 'id' })
+  if (error) {
+    console.error('[API] registerApprovalRequest:', error)
+    return { ok: false, error: error.message }
+  }
+  return { ok: true }
 }
 
 export async function fetchPendingUsers() {

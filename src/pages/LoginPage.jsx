@@ -131,9 +131,13 @@ function RegisterForm({ onBack }) {
         : `建立失敗：${authError.message}`
       )
     } else {
-      // 送出審核申請
+      // 送出審核申請（資料庫 Trigger 也會自動建立，這裡是前端備援）
       if (signUpData?.user) {
-        await registerApprovalRequest(signUpData.user.id, email)
+        const result = await registerApprovalRequest(signUpData.user.id, email)
+        if (result && !result.ok) {
+          // 若前端寫入失敗，資料庫 Trigger 仍會補建記錄，但提示管理員留意
+          console.warn('[Register] approval request failed:', result.error)
+        }
       }
       setDone(true)
     }
