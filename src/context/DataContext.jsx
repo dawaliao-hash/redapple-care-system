@@ -67,10 +67,20 @@ export function DataProvider({ children }) {
     if (now - lastRefetchMs.current < 3000) return
     lastRefetchMs.current = now
     Promise.all([fetchRecipients(), fetchCaregivers()]).then(([r, c]) => {
-      const mr = mergeRecipients(r, recipientsRef.current)
-      const mc = mergeCaregivers(c, caregiversRef.current)
+      const prevR = recipientsRef.current
+      const prevC = caregiversRef.current
+      // 保留「本地有、雲端還沒有」的項目（例如新增時雲端暫停，只進了 localStorage）
+      const rIds = new Set(r.map(x => x.id))
+      const cIds = new Set(c.map(x => x.id))
+      const localOnlyR = prevR.filter(x => !rIds.has(x.id))
+      const localOnlyC = prevC.filter(x => !cIds.has(x.id))
+      const mr = [...mergeRecipients(r, prevR), ...localOnlyR]
+      const mc = [...mergeCaregivers(c, prevC), ...localOnlyC]
       setRecipients(mr); setLocalR(mr)
       setCaregivers(mc); setLocalC(mc)
+      // 把本地尚未同步的補傳回雲端（雲端恢復後即可存檔）
+      localOnlyR.forEach(x => upsertRecipient(x).catch(() => {}))
+      localOnlyC.forEach(x => upsertCaregiver(x).catch(() => {}))
     }).catch(console.error)
   }, [])
 
