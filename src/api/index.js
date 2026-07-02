@@ -15,7 +15,7 @@ const toRow = (r) => ({
   gender: r.gender,
   age: r.age,
   cms: r.cms,
-  primary_caregiver: r.primaryCaregiver,
+  primary_caregiver: r.primaryCaregiver || null,  // 空字串→null，避免外鍵約束擋下無照服員的長者
   conditions: r.conditions ?? [],
   emergency_contact: r.emergencyContact,
   phone: r.phone,
@@ -103,7 +103,7 @@ const hrFromRow = (row) => ({
 // 若 Supabase 尚未執行 migration，以此備援
 const toRowBase = (r) => ({
   id: r.id, code: r.code, name: r.name, gender: r.gender, age: r.age,
-  cms: r.cms, primary_caregiver: r.primaryCaregiver,
+  cms: r.cms, primary_caregiver: r.primaryCaregiver || null,
   conditions: r.conditions ?? [], emergency_contact: r.emergencyContact,
   phone: r.phone, address: r.address,
   bath_days: r.bathDays ?? [], notes: r.notes, level: r.level,
