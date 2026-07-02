@@ -10,6 +10,36 @@ import { useLocalStorage } from '../utils/useLocalStorage.js'
 
 const DataContext = createContext(null)
 
+// 合併雲端資料與本地狀態：
+// 若 Supabase 未追蹤結案/離職欄位（isActive===undefined，代表 migration 未執行），
+// 保留本地已知的結案/離職狀態，避免重抓時被覆蓋而讓人「消失」。
+function mergeRecipients(fetched, prev) {
+  const byId = new Map(prev.map(x => [x.id, x]))
+  return fetched.map(f => {
+    if (f.isActive === undefined) {
+      const p = byId.get(f.id)
+      return { ...f,
+        isActive:    p?.isActive ?? true,
+        closedAt:    p?.closedAt ?? null,
+        closeReason: p?.closeReason ?? '' }
+    }
+    return { ...f, closedAt: f.closedAt ?? null, closeReason: f.closeReason ?? '' }
+  })
+}
+function mergeCaregivers(fetched, prev) {
+  const byId = new Map(prev.map(x => [x.id, x]))
+  return fetched.map(f => {
+    if (f.isActive === undefined) {
+      const p = byId.get(f.id)
+      return { ...f,
+        isActive:     p?.isActive ?? true,
+        resignedAt:   p?.resignedAt ?? null,
+        resignReason: p?.resignReason ?? '' }
+    }
+    return { ...f, resignedAt: f.resignedAt ?? null, resignReason: f.resignReason ?? '' }
+  })
+}
+
 export function DataProvider({ children }) {
   const [loading, setLoading] = useState(isOnline)
 
@@ -25,6 +55,10 @@ export function DataProvider({ children }) {
   const [recipients, setRecipients] = useState(safeR)
   const [caregivers, setCaregivers] = useState(safeC)
 
+  // 追蹤目前清單，供 refetch 合併時保留本地結案/離職狀態
+  const recipientsRef = useRef(recipients); recipientsRef.current = recipients
+  const caregiversRef = useRef(caregivers); caregiversRef.current = caregivers
+
   // 從 Supabase 重新拉取長者和照服員（節流：3 秒內不重複）
   const lastRefetchMs = useRef(0)
   const refetchData = useCallback(() => {
@@ -33,8 +67,10 @@ export function DataProvider({ children }) {
     if (now - lastRefetchMs.current < 3000) return
     lastRefetchMs.current = now
     Promise.all([fetchRecipients(), fetchCaregivers()]).then(([r, c]) => {
-      setRecipients(r); setLocalR(r)
-      setCaregivers(c); setLocalC(c)
+      const mr = mergeRecipients(r, recipientsRef.current)
+      const mc = mergeCaregivers(c, caregiversRef.current)
+      setRecipients(mr); setLocalR(mr)
+      setCaregivers(mc); setLocalC(mc)
     }).catch(console.error)
   }, [])
 
@@ -48,8 +84,9 @@ export function DataProvider({ children }) {
       const localOnlyR = safeR.filter(x => !supabaseRIds.has(x.id))
       const localOnlyC = safeC.filter(x => !supabaseCIds.has(x.id))
 
-      const mergedR = [...r, ...localOnlyR]
-      const mergedC = [...c, ...localOnlyC]
+      // 以 localStorage 為 prev 合併，保留本地結案/離職狀態（migration 未執行時）
+      const mergedR = [...mergeRecipients(r, safeR), ...localOnlyR]
+      const mergedC = [...mergeCaregivers(c, safeC), ...localOnlyC]
 
       setRecipients(mergedR); setLocalR(mergedR)
       setCaregivers(mergedC); setLocalC(mergedC)

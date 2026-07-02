@@ -47,9 +47,10 @@ const fromRow = (row) => ({
   level: row.level,
   disabilities: row.disabilities ?? { categories: [], level: '輕度' },
   serviceCategory: row.service_category ?? 'elderly',
-  isActive: row.is_active !== false,
-  closedAt: row.closed_at ?? null,
-  closeReason: row.close_reason ?? '',
+  // 欄位不存在（migration 未執行）時回傳 undefined，讓 DataContext 保留本地結案狀態
+  isActive:    ('is_active'    in row) ? (row.is_active !== false) : undefined,
+  closedAt:    ('closed_at'    in row) ? (row.closed_at ?? null)   : undefined,
+  closeReason: ('close_reason' in row) ? (row.close_reason ?? '')  : undefined,
 })
 
 const cgFromRow = (row) => ({
@@ -57,9 +58,9 @@ const cgFromRow = (row) => ({
   name: row.name,
   avatar: row.avatar,
   color: row.color,
-  isActive:     row.is_active !== false,
-  resignedAt:   row.resigned_at  ?? null,
-  resignReason: row.resign_reason ?? '',
+  isActive:     ('is_active'     in row) ? (row.is_active !== false) : undefined,
+  resignedAt:   ('resigned_at'   in row) ? (row.resigned_at ?? null) : undefined,
+  resignReason: ('resign_reason' in row) ? (row.resign_reason ?? '') : undefined,
 })
 
 const cgToRow = (c) => ({
