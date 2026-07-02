@@ -26,6 +26,20 @@ function mergeRecipients(fetched, prev) {
     return { ...f, closedAt: f.closedAt ?? null, closeReason: f.closeReason ?? '' }
   })
 }
+// 只挑出「雲端還沒有的新個案」：以 code（個案編號）比對，非 id。
+// 這樣即使不同裝置對同一人有不同 id，也不會重複上傳造成雲端重複資料。
+function onlyNewRecipients(local, fetched) {
+  const codes = new Set(fetched.map(x => x.code).filter(Boolean))
+  const ids   = new Set(fetched.map(x => x.id))
+  return local.filter(x => !ids.has(x.id) && (!x.code || !codes.has(x.code)))
+}
+// 照服員沒有 code，以 name 比對避免重複
+function onlyNewCaregivers(local, fetched) {
+  const names = new Set(fetched.map(x => x.name).filter(Boolean))
+  const ids   = new Set(fetched.map(x => x.id))
+  return local.filter(x => !ids.has(x.id) && (!x.name || !names.has(x.name)))
+}
+
 function mergeCaregivers(fetched, prev) {
   const byId = new Map(prev.map(x => [x.id, x]))
   return fetched.map(f => {
@@ -44,8 +58,9 @@ export function DataProvider({ children }) {
   const [loading, setLoading] = useState(isOnline)
 
   // ── 離線備用（localStorage）────────────────────────────────
-  const [localR, setLocalR] = useLocalStorage('redapple_recipients', INIT_R)
-  const [localC, setLocalC] = useLocalStorage('redapple_caregivers', INIT_C)
+  // v3：清除舊版本殘留的錯誤 id 本地快取（避免重複上傳造成雲端重複）
+  const [localR, setLocalR] = useLocalStorage('redapple_recipients_v3', INIT_R)
+  const [localC, setLocalC] = useLocalStorage('redapple_caregivers_v3', INIT_C)
 
   // 若 localStorage 被舊版本寫入空陣列，直接改用 JS 預設資料
   const safeR = Array.isArray(localR) && localR.length > 0 ? localR : INIT_R
@@ -69,16 +84,14 @@ export function DataProvider({ children }) {
     Promise.all([fetchRecipients(), fetchCaregivers()]).then(([r, c]) => {
       const prevR = recipientsRef.current
       const prevC = caregiversRef.current
-      // 保留「本地有、雲端還沒有」的項目（例如新增時雲端暫停，只進了 localStorage）
-      const rIds = new Set(r.map(x => x.id))
-      const cIds = new Set(c.map(x => x.id))
-      const localOnlyR = prevR.filter(x => !rIds.has(x.id))
-      const localOnlyC = prevC.filter(x => !cIds.has(x.id))
+      // 保留「本地有、雲端還沒有」的項目 — 以 code/name 比對（非 id），避免同一人重複上傳
+      const localOnlyR = onlyNewRecipients(prevR, r)
+      const localOnlyC = onlyNewCaregivers(prevC, c)
       const mr = [...mergeRecipients(r, prevR), ...localOnlyR]
       const mc = [...mergeCaregivers(c, prevC), ...localOnlyC]
       setRecipients(mr); setLocalR(mr)
       setCaregivers(mc); setLocalC(mc)
-      // 把本地尚未同步的補傳回雲端（雲端恢復後即可存檔）
+      // 只補傳「雲端沒有的新個案」（依 code/name 判定），不會重複上傳既有人員
       localOnlyR.forEach(x => upsertRecipient(x).catch(() => {}))
       localOnlyC.forEach(x => upsertCaregiver(x).catch(() => {}))
     }).catch(console.error)
@@ -88,11 +101,9 @@ export function DataProvider({ children }) {
   useEffect(() => {
     if (!isOnline) { setLoading(false); return }
     Promise.all([fetchRecipients(), fetchCaregivers()]).then(([r, c]) => {
-      // 找出本地有、Supabase 沒有的項目（剛新增但 Supabase 尚未存到的）
-      const supabaseRIds = new Set(r.map(x => x.id))
-      const supabaseCIds = new Set(c.map(x => x.id))
-      const localOnlyR = safeR.filter(x => !supabaseRIds.has(x.id))
-      const localOnlyC = safeC.filter(x => !supabaseCIds.has(x.id))
+      // 找出本地有、Supabase 沒有的「新個案」— 以 code/name 比對，避免重複上傳既有人員
+      const localOnlyR = onlyNewRecipients(safeR, r)
+      const localOnlyC = onlyNewCaregivers(safeC, c)
 
       // 以 localStorage 為 prev 合併，保留本地結案/離職狀態（migration 未執行時）
       const mergedR = [...mergeRecipients(r, safeR), ...localOnlyR]
