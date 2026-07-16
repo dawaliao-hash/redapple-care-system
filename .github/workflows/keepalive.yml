@@ -1,0 +1,43 @@
+name: Supabase Keep-Alive
+
+# 目的：Supabase 免費方案約 7 天無活動就會自動暫停（專案網址會從 DNS 消失，
+# 導致登入失敗 "Failed to fetch"）。此排程每 3 天自動戳一次資料庫，
+# 讓專案保持 Active，不需再手動 Restore。
+
+on:
+  schedule:
+    # 每 3 天的 UTC 02:00 執行（台灣時間早上 10:00）
+    - cron: '0 2 */3 * *'
+  workflow_dispatch:   # 也可到 Actions 頁面手動按「Run workflow」立即執行
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase（保持專案 Active）
+        env:
+          SUPABASE_URL: https://sjaitlgpmnefvegxlcbo.supabase.co
+          # 這是 publishable（anon）金鑰，本來就會公開在前端 JS 中，非機密
+          SUPABASE_KEY: sb_publishable_nk8PRrnSI97vJualT7V82A_4Kc4aGcw
+        run: |
+          set -e
+          echo "時間：$(date -u) UTC"
+
+          # 1) Auth 健康檢查
+          AUTH_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+            "$SUPABASE_URL/auth/v1/health" -H "apikey: $SUPABASE_KEY")
+          echo "Auth health: HTTP $AUTH_CODE"
+
+          # 2) 實際查詢資料庫（這才是真正算「使用」的活動）
+          REST_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+            "$SUPABASE_URL/rest/v1/recipients?select=id&limit=1" \
+            -H "apikey: $SUPABASE_KEY")
+          echo "REST query: HTTP $REST_CODE"
+
+          # 只要任一個有回應（非 000）就代表專案是活的
+          if [ "$AUTH_CODE" = "000" ] && [ "$REST_CODE" = "000" ]; then
+            echo "::error::Supabase 無回應 — 專案可能已被暫停，請至 Dashboard 按 Restore"
+            exit 1
+          fi
+
+          echo "✅ Supabase 正常運作中，保活完成"
