@@ -83,18 +83,12 @@ export function DataProvider({ children }) {
     if (now - lastRefetchMs.current < 3000) return
     lastRefetchMs.current = now
     Promise.all([fetchRecipients(), fetchCaregivers()]).then(([r, c]) => {
-      const prevR = recipientsRef.current
-      const prevC = caregiversRef.current
-      // 保留「本地有、雲端還沒有」的項目 — 以 code/name 比對（非 id），避免同一人重複上傳
-      const localOnlyR = onlyNewRecipients(prevR, r)
-      const localOnlyC = onlyNewCaregivers(prevC, c)
-      const mr = [...mergeRecipients(r, prevR), ...localOnlyR]
-      const mc = [...mergeCaregivers(c, prevC), ...localOnlyC]
+      // 雲端為唯一來源：直接以雲端資料為準。
+      // 不再保留/補傳本地殘留項目，避免「已刪除的資料被本機殘留復活」。
+      const mr = mergeRecipients(r, recipientsRef.current)
+      const mc = mergeCaregivers(c, caregiversRef.current)
       setRecipients(mr); setLocalR(mr)
       setCaregivers(mc); setLocalC(mc)
-      // 只補傳「雲端沒有的新個案」（依 code/name 判定），不會重複上傳既有人員
-      localOnlyR.forEach(x => upsertRecipient(x).catch(() => {}))
-      localOnlyC.forEach(x => upsertCaregiver(x).catch(() => {}))
     }).catch(console.error)
   }, [])
 
@@ -102,21 +96,12 @@ export function DataProvider({ children }) {
   useEffect(() => {
     if (!isOnline) { setLoading(false); return }
     Promise.all([fetchRecipients(), fetchCaregivers()]).then(([r, c]) => {
-      // 找出本地有、Supabase 沒有的「新個案」— 以 code/name 比對，避免重複上傳既有人員
-      const localOnlyR = onlyNewRecipients(safeR, r)
-      const localOnlyC = onlyNewCaregivers(safeC, c)
-
-      // 以 localStorage 為 prev 合併，保留本地結案/離職狀態（migration 未執行時）
-      const mergedR = [...mergeRecipients(r, safeR), ...localOnlyR]
-      const mergedC = [...mergeCaregivers(c, safeC), ...localOnlyC]
-
+      // 雲端為唯一來源：載入時直接以雲端資料覆蓋本地，已刪除的項目不會殘留。
+      const mergedR = mergeRecipients(r, safeR)
+      const mergedC = mergeCaregivers(c, safeC)
       setRecipients(mergedR); setLocalR(mergedR)
       setCaregivers(mergedC); setLocalC(mergedC)
       setLoading(false)
-
-      // 嘗試把本地新增的重新同步到 Supabase（背景執行，不阻擋 UI）
-      localOnlyR.forEach(x => upsertRecipient(x).catch(console.error))
-      localOnlyC.forEach(x => upsertCaregiver(x).catch(console.error))
     }).catch(() => setLoading(false))
   }, [])
 
