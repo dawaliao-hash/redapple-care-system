@@ -81,6 +81,7 @@ function RecipientModal({ initial, caregivers, allRecipients, onSave, onClose })
   })
   const [condInput, setCondInput] = useState((initial?.conditions ?? []).join('、'))
   const [err, setErr] = useState('')
+  const [saving, setSaving] = useState(false)   // 防呆：送出中鎖定，避免連點重複新增
 
   // 出生年月日（民國）— UI only，計算後寫入 form.age
   const [bY, setBY] = useState('')  // 民國年
@@ -102,10 +103,21 @@ function RecipientModal({ initial, caregivers, allRecipients, onSave, onClose })
   )
 
   const handleSave = () => {
+    if (saving) return                                   // 防呆①：避免連點重複送出
     if (!form.name.trim()) { setErr('請填寫姓名'); return }
     if (!form.code.trim()) { setErr('請填寫個案編號'); return }
+    const codeNorm = form.code.trim()
+    // 防呆②：個案編號不可重複（去空白比對，排除自己）
+    const dup = (allRecipients ?? []).find(r =>
+      r.id !== form.id && (r.code || '').trim() === codeNorm
+    )
+    if (dup) {
+      setErr(`個案編號「${codeNorm}」已存在（${dup.name}${dup.isActive === false ? '，已結案' : ''}），不可重複新增`)
+      return
+    }
+    setSaving(true)
     const age = computedAge ?? (form.age !== '' ? Number(form.age) : 0)
-    onSave({ ...form, conditions: condInput.split(/[、,，\s]+/).filter(Boolean), age })
+    onSave({ ...form, code: codeNorm, conditions: condInput.split(/[、,，\s]+/).filter(Boolean), age })
   }
 
   // 民國年選項：民國20年(1931)到民國120年(2031)
@@ -385,10 +397,11 @@ function RecipientModal({ initial, caregivers, allRecipients, onSave, onClose })
           <button onClick={onClose}
             className="px-4 py-2 rounded-lg text-sm border transition hover:bg-orange-50"
             style={{ borderColor: '#C4A87A', color: '#5C3A1E' }}>取消</button>
-          <button onClick={handleSave}
-            className="px-5 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
-            style={{ background: '#A53838', color: 'white' }}>
-            <Check size={15} />{isNew ? '新增' : '儲存'}
+          <button onClick={handleSave} disabled={saving}
+            className="px-5 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition"
+            style={{ background: saving ? '#D9C9A8' : '#A53838', color: saving ? '#8B6F47' : 'white',
+                     cursor: saving ? 'not-allowed' : 'pointer' }}>
+            <Check size={15} />{saving ? '儲存中⋯' : (isNew ? '新增' : '儲存')}
           </button>
         </div>
       </ModalBox>
