@@ -10,7 +10,7 @@ import { CAREGIVERS as DEFAULT_C } from '../data/caregivers.js'
 
 const toRow = (r) => ({
   id: r.id,
-  code: r.code,
+  code: (r.code || '').trim(),  // 去除編號前後空白，避免同一人因空格被當成不同人而重複
   name: r.name,
   gender: r.gender,
   age: r.age,
@@ -32,7 +32,7 @@ const toRow = (r) => ({
 
 const fromRow = (row) => ({
   id: row.id,
-  code: row.code,
+  code: (row.code || '').trim(),
   name: row.name,
   gender: row.gender,
   age: row.age,
@@ -102,7 +102,7 @@ const hrFromRow = (row) => ({
 // 僅含原始欄位（不含 005/006 migration 新增的欄位）
 // 若 Supabase 尚未執行 migration，以此備援
 const toRowBase = (r) => ({
-  id: r.id, code: r.code, name: r.name, gender: r.gender, age: r.age,
+  id: r.id, code: (r.code || '').trim(), name: r.name, gender: r.gender, age: r.age,
   cms: r.cms, primary_caregiver: r.primaryCaregiver || null,
   conditions: r.conditions ?? [], emergency_contact: r.emergencyContact,
   phone: r.phone, address: r.address,

@@ -29,9 +29,10 @@ function mergeRecipients(fetched, prev) {
 // 只挑出「雲端還沒有的新個案」：以 code（個案編號）比對，非 id。
 // 這樣即使不同裝置對同一人有不同 id，也不會重複上傳造成雲端重複資料。
 function onlyNewRecipients(local, fetched) {
-  const codes = new Set(fetched.map(x => x.code).filter(Boolean))
+  const norm  = c => (c || '').trim()  // 去空白比對，避免同一人因編號空格被當成新個案
+  const codes = new Set(fetched.map(x => norm(x.code)).filter(Boolean))
   const ids   = new Set(fetched.map(x => x.id))
-  return local.filter(x => !ids.has(x.id) && (!x.code || !codes.has(x.code)))
+  return local.filter(x => !ids.has(x.id) && (!norm(x.code) || !codes.has(norm(x.code))))
 }
 // 照服員沒有 code，以 name 比對避免重複
 function onlyNewCaregivers(local, fetched) {
