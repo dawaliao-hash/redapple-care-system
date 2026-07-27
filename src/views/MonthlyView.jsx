@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, GripVertical, CheckCheck } from 'lucide-react'
+import { ChevronLeft, ChevronRight, GripVertical, CheckCheck, RotateCcw } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { STATUS_TYPES } from '../data/statusTypes.js'
 import { formatDisplayDate } from '../data/monthlyAttendance.js'
@@ -181,8 +181,62 @@ export default function MonthlyView({
     return t
   }, [monthlyAttendance, workDays, RECIPIENTS, getDayValue])
 
+  // ── 備份 / 復原機制 ──────────────────────────────────────
+  const monthKey = `${viewYear}/${String(viewMonth).padStart(2, '0')}`
+  const UNDO_KEY = 'redapple_attendance_undo'
+  const [undoInfo, setUndoInfo] = useState(() => {
+    try {
+      const raw = localStorage.getItem(UNDO_KEY)
+      return raw ? JSON.parse(raw) : null
+    } catch { return null }
+  })
+
+  // 備份目前檢視月份的點名狀態（執行大量變更前呼叫）
+  const saveSnapshot = useCallback(() => {
+    const snap = {}
+    Object.entries(monthlyAttendance).forEach(([date, day]) => {
+      if (date.startsWith(monthKey)) snap[date] = { ...day }
+    })
+    const info = { monthKey, savedAt: new Date().toLocaleString('zh-TW'), data: snap }
+    try { localStorage.setItem(UNDO_KEY, JSON.stringify(info)) } catch {}
+    setUndoInfo(info)
+  }, [monthlyAttendance, monthKey])
+
+  // 復原到備份時的狀態（差異會同步回雲端）
+  const restoreSnapshot = useCallback(() => {
+    if (!undoInfo || undoInfo.monthKey !== monthKey) return
+    if (!window.confirm(
+      `確定要將 ${undoInfo.monthKey} 的點名復原到備份時（${undoInfo.savedAt}）的狀態嗎？\n\n備份之後所做的變更將被還原。`
+    )) return
+    const data = undoInfo.data || {}
+    setMonthlyAttendance(prev => {
+      const next = { ...prev }
+      // 該月現有日期：以備份為準（備份沒有的標記清為空白）
+      Object.keys(prev).forEach(date => {
+        if (!date.startsWith(monthKey)) return
+        const snapDay = data[date] || {}
+        const merged = {}
+        Object.keys(prev[date] || {}).forEach(rid => { merged[rid] = snapDay[rid] ?? '' })
+        Object.entries(snapDay).forEach(([rid, st]) => { merged[rid] = st })
+        next[date] = merged
+      })
+      // 備份有但目前沒有的日期 → 補回
+      Object.entries(data).forEach(([date, day]) => {
+        if (!next[date]) next[date] = { ...day }
+      })
+      return next
+    })
+  }, [undoInfo, monthKey, setMonthlyAttendance])
+
   // 一鍵全員出席：將本月所有未設定的過去/今天工作日設為 present
+  // 防呆：需確認後才執行；執行前自動備份，可用「復原」還原
   const markAllPresent = useCallback(() => {
+    if (!window.confirm(
+      `確定要將 ${viewMonth} 月所有「尚未設定」的工作日標記為出席嗎？\n\n` +
+      `・已點過的狀態（休假/住院/回診⋯）不會被覆蓋\n` +
+      `・執行前會自動備份本月狀態，按「復原」可還原`
+    )) return
+    saveSnapshot()
     setMonthlyAttendance(prev => {
       const next = { ...prev }
       workDays.forEach(d => {
@@ -199,7 +253,7 @@ export default function MonthlyView({
       })
       return next
     })
-  }, [workDays, today, holidays, RECIPIENTS, setMonthlyAttendance])
+  }, [workDays, today, holidays, RECIPIENTS, setMonthlyAttendance, saveSnapshot, viewMonth])
 
   const ROC = viewYear - 1911
 
@@ -252,12 +306,22 @@ export default function MonthlyView({
         </div>
         <p className="text-xs w-full" style={{ color: '#8B6F47' }}>
           點擊格子切換狀態 · 假日預設「假」，可手動調整為其他狀態 · 橫向滑動查看全月</p>
-        <button onClick={markAllPresent}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition hover:shadow-md"
-          style={{ background: '#7A9474', color: 'white', flexShrink: 0 }}
-          title="將本月所有未設定的工作日標記為出席（不覆蓋已設定的狀態）">
-          <CheckCheck size={16}/> 一鍵全員出席
-        </button>
+        <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>
+          <button onClick={markAllPresent}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition hover:shadow-md"
+            style={{ background: '#7A9474', color: 'white' }}
+            title="將本月所有未設定的工作日標記為出席（不覆蓋已設定的狀態；執行前自動備份）">
+            <CheckCheck size={16}/> 一鍵全員出席
+          </button>
+          {undoInfo?.monthKey === monthKey && (
+            <button onClick={restoreSnapshot}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm border transition hover:bg-orange-50"
+              style={{ borderColor: '#C4A87A', color: '#A53838' }}
+              title={`復原到 ${undoInfo.savedAt} 備份的狀態`}>
+              <RotateCcw size={14}/> 復原
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── 月度表格 ── */}
