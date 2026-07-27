@@ -1,8 +1,9 @@
-import { useState, useMemo, useRef, useCallback } from 'react'
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, GripVertical } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { STATUS_TYPES } from '../data/statusTypes.js'
 import { formatDisplayDate } from '../data/monthlyAttendance.js'
+import { inCareDuringMonth } from '../utils/careWindow.js'
 
 const WD = ['日','一','二','三','四','五','六']
 
@@ -40,10 +41,24 @@ export default function StaffingView({
   recipientOrder = [],
   setRecipientOrder,
   holidays = {},
+  ensureMonthLoaded,
 }) {
-  const { activeRecipients: RECIPIENTS, activeCaregivers: CAREGIVERS } = useData()
+  const { recipients: ALL_RECIPIENTS, activeCaregivers: CAREGIVERS } = useData()
   const today    = new Date()
   const todayStr = formatDisplayDate(today)
+
+  // 月份導覽（提前宣告，供月份感知名單使用）
+  const [viewYear,  setViewYear]  = useState(today.getFullYear())
+  const [viewMonth, setViewMonth] = useState(today.getMonth() + 1)
+
+  // 月份感知名單：只顯示該月份在案的長者（依開案/結案日期）
+  const RECIPIENTS = useMemo(
+    () => ALL_RECIPIENTS.filter(r => inCareDuringMonth(r, viewYear, viewMonth)),
+    [ALL_RECIPIENTS, viewYear, viewMonth]
+  )
+
+  // 切換月份時，自動向雲端載入該月點名資料
+  useEffect(() => { ensureMonthLoaded?.(viewYear, viewMonth) }, [viewYear, viewMonth, ensureMonthLoaded])
 
   // 照服員查詢 map
   const cgMap = useMemo(() => {
@@ -59,9 +74,7 @@ export default function StaffingView({
     return [...ordered.map(id => RECIPIENTS.find(r => r.id === id)), ...unordered].filter(Boolean)
   }, [recipientOrder, RECIPIENTS])
 
-  // 月份導覽
-  const [viewYear,  setViewYear]  = useState(today.getFullYear())
-  const [viewMonth, setViewMonth] = useState(today.getMonth() + 1)
+  // 月份導覽按鈕
   const prevMonth = () => viewMonth === 1  ? (setViewYear(y => y-1), setViewMonth(12)) : setViewMonth(m => m-1)
   const nextMonth = () => viewMonth === 12 ? (setViewYear(y => y+1), setViewMonth(1))  : setViewMonth(m => m+1)
 

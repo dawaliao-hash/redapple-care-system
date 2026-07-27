@@ -28,6 +28,7 @@ const toRow = (r) => ({
   is_active: r.isActive !== false,
   closed_at: r.closedAt ?? null,
   close_reason: r.closeReason ?? '',
+  admitted_at: r.admittedAt ?? null,
 })
 
 const fromRow = (row) => ({
@@ -51,6 +52,7 @@ const fromRow = (row) => ({
   isActive:    ('is_active'    in row) ? (row.is_active !== false) : undefined,
   closedAt:    ('closed_at'    in row) ? (row.closed_at ?? null)   : undefined,
   closeReason: ('close_reason' in row) ? (row.close_reason ?? '')  : undefined,
+  admittedAt:  ('admitted_at'  in row) ? (row.admitted_at ?? null) : undefined,
 })
 
 const cgFromRow = (row) => ({

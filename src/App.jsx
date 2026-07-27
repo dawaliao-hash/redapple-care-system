@@ -75,10 +75,19 @@ function AppInner({ signOut, user }) {
     })
   }, [])
 
+  // 依月份載入雲端點名資料（每月只抓一次；月度點名/月度人力切換月份時呼叫）
+  const loadedMonths = useRef(new Set())
+  const ensureMonthLoaded = useCallback((year, month) => {
+    if (!isOnline) return
+    const key = `${year}/${String(month).padStart(2, '0')}`
+    if (loadedMonths.current.has(key)) return
+    loadedMonths.current.add(key)
+    fetchAttendanceForMonth(year, month).then(mergeAttendance)
+  }, [mergeAttendance])
+
   // Supabase 啟動時同步本月資料
   useEffect(() => {
-    if (!isOnline) return
-    fetchAttendanceForMonth(today.getFullYear(), today.getMonth() + 1).then(mergeAttendance)
+    ensureMonthLoaded(today.getFullYear(), today.getMonth() + 1)
   }, [])
 
   // 寫入出缺席 → 同時更新 local 和 Supabase
@@ -266,6 +275,7 @@ function AppInner({ signOut, user }) {
             setMonthlyAttendance={setMonthlyAttendance}
             recipientOrder={recipientOrder}
             setRecipientOrder={setRecipientOrder}
+            ensureMonthLoaded={ensureMonthLoaded}
             {...sharedProps}
           />
         )}
@@ -275,6 +285,7 @@ function AppInner({ signOut, user }) {
             dailyAssignments={effectiveDailyAssignments}
             recipientOrder={recipientOrder}
             setRecipientOrder={setRecipientOrder}
+            ensureMonthLoaded={ensureMonthLoaded}
             {...sharedProps}
           />
         )}

@@ -1,8 +1,9 @@
-import { useState, useMemo, useRef, useCallback } from 'react'
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, GripVertical, CheckCheck } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { STATUS_TYPES } from '../data/statusTypes.js'
 import { formatDisplayDate } from '../data/monthlyAttendance.js'
+import { inCareDuringMonth } from '../utils/careWindow.js'
 
 // 月度表用的短符號（含假日）
 const SHORT = {
@@ -38,9 +39,24 @@ export default function MonthlyView({
   monthlyAttendance, setMonthlyAttendance,
   recipientOrder = [], setRecipientOrder,
   holidays = {},
+  ensureMonthLoaded,
 }) {
-  const { activeRecipients: RECIPIENTS } = useData()
+  const { recipients: ALL_RECIPIENTS } = useData()
   const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d }, [])
+
+  const [viewYear, setViewYear]   = useState(today.getFullYear())
+  const [viewMonth, setViewMonth] = useState(today.getMonth() + 1)
+
+  // 月份感知名單：依開案/結案日期，只顯示「該月份在案」的長者
+  // - 6月開案的新案 → 5月(含)以前的月份不顯示
+  // - 5/26 結案的個案 → 5月仍顯示（當月仍在案）、6月起不顯示
+  const RECIPIENTS = useMemo(
+    () => ALL_RECIPIENTS.filter(r => inCareDuringMonth(r, viewYear, viewMonth)),
+    [ALL_RECIPIENTS, viewYear, viewMonth]
+  )
+
+  // 切換月份時，自動向雲端載入該月點名資料（解決「切月份看不到歷史點名」）
+  useEffect(() => { ensureMonthLoaded?.(viewYear, viewMonth) }, [viewYear, viewMonth, ensureMonthLoaded])
 
   // 依共用 recipientOrder 排列（新增長者接在最後）
   const SORTED_RECIPIENTS = useMemo(() => {
@@ -92,9 +108,6 @@ export default function MonthlyView({
     })
     setDragId(null); setDragOverId(null)
   }, [dragId, dragAbove, SORTED_RECIPIENTS, setRecipientOrder])
-
-  const [viewYear, setViewYear]   = useState(today.getFullYear())
-  const [viewMonth, setViewMonth] = useState(today.getMonth() + 1)
 
   const prevMonth = () => {
     if (viewMonth === 1) { setViewYear(y => y - 1); setViewMonth(12) }

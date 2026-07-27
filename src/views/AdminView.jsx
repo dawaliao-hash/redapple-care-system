@@ -69,13 +69,18 @@ function normalizeDisabilities(d) {
 function RecipientModal({ initial, caregivers, allRecipients, onSave, onClose }) {
   const isNew = !initial?.id
   const [form, setForm] = useState(() => {
-    if (!initial) return {
-      id: `r${Date.now()}`, code: '', name: '', gender: '女', age: '',
-      cms: 5, primaryCaregiver: '',   // 預設未選擇
-      conditions: [], emergencyContact: '', phone: '', address: '',
-      bathDays: [], notes: '', level: '第三類',
-      disabilities: { categories: [], level: '輕度' },
-      serviceCategory: 'elderly',
+    if (!initial) {
+      const t = new Date()
+      const todayStr = `${t.getFullYear()}/${String(t.getMonth()+1).padStart(2,'0')}/${String(t.getDate()).padStart(2,'0')}`
+      return {
+        id: `r${Date.now()}`, code: '', name: '', gender: '女', age: '',
+        cms: 5, primaryCaregiver: '',   // 預設未選擇
+        conditions: [], emergencyContact: '', phone: '', address: '',
+        bathDays: [], notes: '', level: '第三類',
+        disabilities: { categories: [], level: '輕度' },
+        serviceCategory: 'elderly',
+        admittedAt: todayStr,   // 開案日期：預設今天（決定從哪個月份開始出現在名單）
+      }
     }
     return { ...initial, disabilities: normalizeDisabilities(initial.disabilities) }
   })
@@ -139,6 +144,14 @@ function RecipientModal({ initial, caregivers, allRecipients, onSave, onClose })
           <Field label="個案編號 *">
             <input className={inputCls} style={inputSt} value={form.code}
               onChange={e => set('code', e.target.value)} placeholder="例：108I01011" />
+          </Field>
+          <Field label="開案日期（進入日照的日期）">
+            <input type="date" className={inputCls} style={inputSt}
+              value={(form.admittedAt || '').replace(/\//g, '-')}
+              onChange={e => set('admittedAt', e.target.value.replace(/-/g, '/'))} />
+            <p className="text-xs mt-1" style={{ color: '#A09684' }}>
+              長者只會出現在開案日期之後的月份名單
+            </p>
           </Field>
           <Field label="性別">
             <div className="flex gap-2">
