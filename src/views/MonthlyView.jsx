@@ -20,8 +20,7 @@ const SHORT = {
 }
 
 // 狀態循環：假日日期從 holiday 開始，一般日從 present 開始
-const STATUS_CYCLE      = ['present', 'am', 'pm', 'rest', 'hospital', 'clinic', 'blood', 'respite', 'holiday', 'absent', '']
-const STATUS_CYCLE_HOLI = ['holiday', 'present', 'am', 'pm', 'rest', 'hospital', 'clinic', 'blood', 'respite', 'absent', '']
+// （狀態切換已改為下拉選單，不再使用循環點擊）
 
 const WD = ['日','一','二','三','四','五','六']
 
@@ -126,18 +125,35 @@ export default function MonthlyView({
 
   const todayStr = formatDisplayDate(today)
 
-  // 點擊格子循環切換狀態（假日日期使用 holiday 優先的循環）
-  const toggleStatus = (recipientId, d) => {
-    const dk    = formatDisplayDate(d)
-    const holi  = holidays[dk]
-    const cur   = monthlyAttendance[dk]?.[recipientId] ?? (holi ? 'holiday' : '')
-    const cycle = holi ? STATUS_CYCLE_HOLI : STATUS_CYCLE
-    const idx   = cycle.indexOf(cur)
-    const next  = cycle[(idx + 1) % cycle.length]
+  // ── 點格子 → 彈出下拉選單直接選狀態（取代舊的循環點擊）──────
+  // cellMenu = { rid, dk, name, dateLabel, cur, left, top }
+  const [cellMenu, setCellMenu] = useState(null)
+  const MENU_W = 200, MENU_H = 316
+
+  const openCellMenu = (e, r, d) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const dk   = formatDisplayDate(d)
+    let left = rect.left + rect.width / 2 - MENU_W / 2
+    left = Math.max(8, Math.min(left, window.innerWidth - MENU_W - 8))
+    let top = rect.bottom + 4
+    if (top + MENU_H > window.innerHeight - 8) top = Math.max(8, rect.top - MENU_H - 4)
+    setCellMenu({
+      rid: r.id, dk,
+      name: r.name,
+      dateLabel: `${d.getMonth() + 1}/${d.getDate()}`,
+      cur: monthlyAttendance[dk]?.[r.id] ?? '',
+      left, top,
+    })
+  }
+
+  const setCellStatus = (statusKey) => {
+    if (!cellMenu) return
+    const { dk, rid } = cellMenu
     setMonthlyAttendance(prev => ({
       ...prev,
-      [dk]: { ...(prev[dk] ?? {}), [recipientId]: next },
+      [dk]: { ...(prev[dk] ?? {}), [rid]: statusKey },
     }))
+    setCellMenu(null)
   }
 
   // 計算某長者某日的出席天數（1.0=全天, 0.5=半天, 0=缺席）
@@ -272,7 +288,7 @@ export default function MonthlyView({
             雲林縣家園關懷協會附設雲林縣私立紅蘋果社區式服務類長期照顧服務機構
           </p>
           <p className="text-xs mt-0.5" style={{ color: '#8B6F47' }}>
-            點擊格子切換狀態 · 橫向滑動查看全月
+            點擊格子選擇狀態 · 橫向滑動查看全月
           </p>
         </div>
 
@@ -305,7 +321,7 @@ export default function MonthlyView({
           ))}
         </div>
         <p className="text-xs w-full" style={{ color: '#8B6F47' }}>
-          點擊格子切換狀態 · 假日預設「假」，可手動調整為其他狀態 · 橫向滑動查看全月</p>
+          點擊格子從選單選擇狀態 · 假日預設「假」，可手動調整為其他狀態 · 橫向滑動查看全月</p>
         <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>
           <button onClick={markAllPresent}
             className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition hover:shadow-md"
@@ -417,12 +433,12 @@ export default function MonthlyView({
                       return (
                         <td key={dk} style={tdBase}>
                           <button
-                            onClick={() => toggleStatus(r.id, d)}
+                            onClick={(e) => openCellMenu(e, r, d)}
                             title={
-                              isDefaultPresent ? '未明確設定（視同出席，點擊可更改）'
+                              isDefaultPresent ? '未明確設定（視同出席，點擊選擇狀態）'
                               : sKey
-                                ? (STATUS_TYPES[sKey]?.label + (holi ? `（${holi}）` : '') + (isPreset ? '（預設）' : ''))
-                                : '點擊預先設定狀態'
+                                ? (STATUS_TYPES[sKey]?.label + (holi ? `（${holi}）` : '') + (isPreset ? '（預設）' : '') + '，點擊選擇狀態')
+                                : '點擊選擇狀態'
                             }
                             style={cellStyle({
                               bg:     s ? s.bg : '#F5F1EA',
@@ -482,6 +498,47 @@ export default function MonthlyView({
         民國 {ROC} 年 {viewMonth} 月服務對象照顧服務紀錄表 ·
         共 {SORTED_RECIPIENTS.length} 位服務對象 · 工作日 {workDays.length} 天
       </p>
+
+      {/* ── 狀態下拉選單（點格子後彈出）── */}
+      {cellMenu && (
+        <>
+          {/* 點選單以外任何地方 → 關閉 */}
+          <div style={{ position: 'fixed', inset: 0, zIndex: 90 }}
+            onClick={() => setCellMenu(null)} />
+          <div style={{
+            position: 'fixed', zIndex: 91,
+            left: cellMenu.left, top: cellMenu.top, width: MENU_W,
+            background: '#FFFAF0', border: '2px solid #C4A87A', borderRadius: 12,
+            boxShadow: '0 12px 32px rgba(92,40,40,0.25)', padding: 8,
+          }}>
+            <div style={{ fontSize: 12, color: '#8B6F47', padding: '2px 6px 8px', fontWeight: 600 }}>
+              {cellMenu.name} · {cellMenu.dateLabel}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+              {Object.entries(SHORT).map(([key, s]) => (
+                <button key={key} onClick={() => setCellStatus(key)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '6px 8px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                    background: s.bg, color: s.text, cursor: 'pointer',
+                    border: cellMenu.cur === key ? '2px solid #A53838' : '1px solid transparent',
+                  }}>
+                  <span style={{ fontWeight: 700, minWidth: 14, textAlign: 'center' }}>{s.label}</span>
+                  {STATUS_TYPES[key]?.label}
+                </button>
+              ))}
+              <button onClick={() => setCellStatus('')}
+                style={{
+                  gridColumn: '1 / -1', padding: '6px 8px', borderRadius: 8,
+                  fontSize: 12, background: '#F5F1EA', color: '#8B6F47',
+                  border: '1px dashed #C4A87A', cursor: 'pointer',
+                }}>
+                清除（恢復未設定）
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
