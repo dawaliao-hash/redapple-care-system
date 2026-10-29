@@ -27,14 +27,12 @@ import AdminView from './views/AdminView.jsx'
 import AccountView from './views/AccountView.jsx'
 import ReportView from './views/ReportView.jsx'
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
+import NurseApp from './views/NurseApp.jsx'
 
 const today    = new Date()
 const todayStr = formatDisplayDate(today)
 
-// 護理師帳號（role='nurse'）：只能看到「健康紀錄」與「帳號設定」（手機使用情境）
-const HEALTH_ONLY_TABS = ['health', 'account']
-
-function AppInner({ signOut, user, healthOnly = false }) {
+function AppInner({ signOut, user }) {
   const { recipients, loading: dataLoading } = useData()
   const { holidays, syncing, lastSync }      = useHolidaySync()
 
@@ -50,7 +48,7 @@ function AppInner({ signOut, user, healthOnly = false }) {
     () => recipients.map(r => r.id)
   )
 
-  const [tab, setTab] = useState(healthOnly ? 'health' : 'matching')
+  const [tab, setTab] = useState('matching')
 
   // ── 月度出缺席（localStorage 快取 + Supabase 同步）──────────
   // v2：版本號更新讓舊的假資料快取自動失效
@@ -266,7 +264,7 @@ function AppInner({ signOut, user, healthOnly = false }) {
   return (
     <div className="min-h-screen" style={{ background: '#FBF6EC', color: '#3D2817' }}>
       <Header syncing={syncing} lastSync={lastSync} isOnline={isOnline} user={user} signOut={signOut} onSync={refetchFromSupabase} />
-      <TabNav tab={tab} setTab={setTab} allowedTabs={healthOnly ? HEALTH_ONLY_TABS : undefined} />
+      <TabNav tab={tab} setTab={setTab} />
       <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
         {tab === 'matching' && (
           <MatchingView
@@ -366,16 +364,16 @@ function AuthGate() {
   // 登入後檢查帳號審核狀態
   // SQL 執行前的 email 備援清單：這些帳號一律視為管理員
   const ADMIN_EMAILS = ['amuy.chen@gmail.com', 'dawadorge@gmail.com', 'nina0626790@gmail.com']
-  // 護理師帳號（role='nurse' 或在此名單）：免審核，但只能使用健康紀錄
+  // 護理師帳號（role='nurse' 或在此名單）：免審核，直接進入「只有健康紀錄」的手機畫面
   const NURSE_EMAILS = ['yiseadata@gmail.com', 'ytc0626790@gmail.com']
+  // 直接由目前登入者計算（不依賴非同步狀態），避免切換帳號時沿用上一位的權限
+  const isAdminUser = !!user && (user.user_metadata?.role === 'admin' || ADMIN_EMAILS.includes(user.email))
+  const isNurse = !!user && !isAdminUser &&
+    (user.user_metadata?.role === 'nurse' || NURSE_EMAILS.includes(user.email))
   useEffect(() => {
     if (!user) { setApprovalStatus(null); return }
-    if (user.user_metadata?.role === 'admin' || ADMIN_EMAILS.includes(user.email)) {
-      setApprovalStatus('admin'); return
-    }
-    if (user.user_metadata?.role === 'nurse' || NURSE_EMAILS.includes(user.email)) {
-      setApprovalStatus('nurse'); return
-    }
+    if (isAdminUser) { setApprovalStatus('admin'); return }
+    if (isNurse)     { setApprovalStatus('nurse'); return }
     checkApprovalStatus(user.id).then(setApprovalStatus)
   }, [user])
 
@@ -405,13 +403,21 @@ function AuthGate() {
 
   if (!user) return <LoginPage />
 
+  if (isNurse) {
+    return (
+      <DataProvider>
+        <NurseApp user={user} signOut={signOut} />
+      </DataProvider>
+    )
+  }
+
   if (approvalStatus === 'pending' || approvalStatus === 'rejected') {
     return <PendingApprovalPage status={approvalStatus} user={user} signOut={signOut} />
   }
 
   return (
     <DataProvider>
-      <AppInner signOut={signOut} user={user} healthOnly={approvalStatus === 'nurse'} />
+      <AppInner signOut={signOut} user={user} />
     </DataProvider>
   )
 }

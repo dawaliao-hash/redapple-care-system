@@ -363,6 +363,17 @@ export async function setUserApprovalStatus(userId, status) {
   if (error) throw error
 }
 
+// 護理師畫面：取得某一天所有長者的健康紀錄 → { recipientId: record }
+export async function fetchHealthRecordsByDate(fullDate) {
+  if (!isOnline) return {}
+  const { data, error } = await supabase
+    .from('health_records')
+    .select('*')
+    .eq('full_date', fullDate)
+  if (error) { console.error('[API] fetchHealthRecordsByDate:', error); return {} }
+  return Object.fromEntries(data.map(row => [row.recipient_id, hrFromRow(row)]))
+}
+
 // 管理員：列出所有帳號與屬性（需先執行 016_admin_list_accounts.sql）
 export async function fetchAllAccounts() {
   if (!isOnline) return []
