@@ -281,6 +281,30 @@ export default function MonthlyView({
     })
   }, [workDays, today, holidays, RECIPIENTS, setMonthlyAttendance, saveSnapshot, viewMonth])
 
+  // ── 點日期標題 → 整排切換「國定假」（颱風假等臨時停班）──────
+  // 第一次點：整排改為國定假，並備份原本狀態
+  // 再點一次：還原備份；沒有備份（例如換了裝置）則全員改為出席
+  const COL_BACKUP_KEY = 'redapple_holiday_column_backup'
+  const toggleColumnHoliday = useCallback((dk) => {
+    let backups = {}
+    try { backups = JSON.parse(localStorage.getItem(COL_BACKUP_KEY) || '{}') } catch {}
+    setMonthlyAttendance(prev => {
+      const day = prev[dk] ?? {}
+      const allHoliday = RECIPIENTS.length > 0 && RECIPIENTS.every(r => day[r.id] === 'holiday')
+      const nextDay = { ...day }
+      if (allHoliday) {
+        const bk = backups[dk] ?? {}
+        RECIPIENTS.forEach(r => { nextDay[r.id] = bk[r.id] || 'present' })
+        delete backups[dk]
+      } else {
+        backups[dk] = Object.fromEntries(RECIPIENTS.map(r => [r.id, day[r.id] ?? '']))
+        RECIPIENTS.forEach(r => { nextDay[r.id] = 'holiday' })
+      }
+      try { localStorage.setItem(COL_BACKUP_KEY, JSON.stringify(backups)) } catch {}
+      return { ...prev, [dk]: nextDay }
+    })
+  }, [RECIPIENTS, setMonthlyAttendance])
+
   const ROC = viewYear - 1911
 
   return (
@@ -331,7 +355,7 @@ export default function MonthlyView({
           ))}
         </div>
         <p className="text-xs w-full" style={{ color: '#8B6F47' }}>
-          點擊格子從選單選擇狀態 · 假日預設「假」，可手動調整為其他狀態 · 橫向滑動查看全月</p>
+          點擊格子從選單選擇狀態 · 點日期標題可整排改為國定假（颱風假），再點一次還原 · 假日預設「假」，可手動調整為其他狀態 · 橫向滑動查看全月</p>
         <p className="text-xs w-full px-3 py-2 rounded-lg" style={{ background: '#E2D5E8', color: '#5C2D6A' }}>
           <span className="font-bold">備註｜喘息服務：</span>
           讓長期照顧失能或失智長輩的家庭照顧者，在白天能夠暫時卸下照顧責任，獲得休息、就醫或處理個人事務的時間。</p>
@@ -375,9 +399,16 @@ export default function MonthlyView({
                   const dk     = formatDisplayDate(d)
                   const holi   = holidays[dk]
                   const isToday = dk === todayStr
+                  const colHoliday = RECIPIENTS.length > 0 &&
+                    RECIPIENTS.every(r => monthlyAttendance[dk]?.[r.id] === 'holiday')
                   return (
-                    <th key={dk} style={{
+                    <th key={dk}
+                      onClick={() => toggleColumnHoliday(dk)}
+                      title={colHoliday ? '點擊還原整排（取消國定假）' : '點擊將整排改為國定假（如颱風假）'}
+                      style={{
                       ...thDate,
+                      cursor: 'pointer',
+                      ...(colHoliday ? { outline: '2px solid #9B6CC8', outlineOffset: -2 } : {}),
                       color:      isToday ? '#A53838' : holi ? '#8E6BA8' : '#5C2828',
                       background: isToday ? '#FBE8DC' : holi ? '#F0EBF8' : '#FBF1DD',
                       fontWeight: isToday ? 700 : 600,
