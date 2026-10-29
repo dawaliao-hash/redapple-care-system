@@ -22,6 +22,9 @@ const SHORT = {
 // 狀態循環：假日日期從 holiday 開始，一般日從 present 開始
 // （狀態切換已改為下拉選單，不再使用循環點擊）
 
+// 住院/回診/抽血：當天人不在中心，不計入每日人數與合計天數（休假本來就是 0）
+const NOT_ON_SITE = new Set(['hospital', 'clinic', 'blood'])
+
 const WD = ['日','一','二','三','四','五','六']
 
 function getDaysInMonth(year, month) {
@@ -167,6 +170,7 @@ export default function MonthlyView({
       // 未設定：過去/今天非假日 → 視同全天出席
       return (!holi && !isFuture) ? 1.0 : 0
     }
+    if (NOT_ON_SITE.has(status)) return 0
     return STATUS_TYPES[status]?.days ?? 0
   }, [monthlyAttendance, holidays, today])
 
