@@ -195,7 +195,7 @@ function MeasureModal({ initial, recipientName, caregivers, onSave, onClose }) {
 // ════════════════════════════════════════════════════════
 // 主 HealthView
 // ════════════════════════════════════════════════════════
-export default function HealthView({ healthRecords, setHealthRecords, addHealthRecord, onSelectRecipient }) {
+export default function HealthView({ healthRecords, setHealthRecords, addHealthRecord, loadHealthRecords, onSelectRecipient }) {
   const { activeRecipients: RECIPIENTS, activeCaregivers: CAREGIVERS } = useData()
 
   // 長者選擇
@@ -206,6 +206,9 @@ export default function HealthView({ healthRecords, setHealthRecords, addHealthR
   useEffect(() => {
     if (pickedId === '' && RECIPIENTS.length > 0) setPickedId(RECIPIENTS[0].id)
   }, [RECIPIENTS, pickedId])
+
+  // 切換長者時向雲端載入真實紀錄
+  useEffect(() => { loadHealthRecords?.(pickedId) }, [pickedId, loadHealthRecords])
 
   const pickRecipient = (id) => {
     setPickedId(id)

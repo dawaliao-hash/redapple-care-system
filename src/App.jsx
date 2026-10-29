@@ -4,7 +4,6 @@ import { supabase } from './lib/supabase.js'
 import LoginPage from './pages/LoginPage.jsx'
 import PendingApprovalPage from './pages/PendingApprovalPage.jsx'
 import { DataProvider, useData } from './context/DataContext.jsx'
-import { generateHealthRecords } from './data/mockHealth.js'
 import { generateMonthlyAttendance, formatDisplayDate } from './data/monthlyAttendance.js'
 import { useLocalStorage } from './utils/useLocalStorage.js'
 import { useHolidaySync } from './utils/useHolidaySync.js'
@@ -208,9 +207,16 @@ function AppInner({ signOut, user }) {
   }, [])
 
   // ── 健康紀錄（localStorage 快取 + Supabase 同步）──────────────
-  const [healthRecords, setHealthRecordsLocal] = useLocalStorage(
-    'redapple_health_records', generateHealthRecords
-  )
+  // 舊版 key 'redapple_health_records' 會在暫存為空時塞入亂數假資料，看起來像「每天自動記錄」；
+  // 改用新 key、預設空白，並以雲端為準載入各長者紀錄
+  const [healthRecords, setHealthRecordsLocal] = useLocalStorage('redapple_health_records_v2', {})
+
+  // 依長者向雲端載入健康紀錄（雲端為唯一來源）
+  const loadHealthRecords = useCallback(async (recipientId) => {
+    if (!isOnline || !recipientId) return
+    const recs = await fetchHealthRecords(recipientId)
+    setHealthRecordsLocal(prev => ({ ...prev, [recipientId]: recs }))
+  }, [])
 
   // 新增量測：先樂觀更新 local，再同步 Supabase
   const setHealthRecords = useCallback((updater) => {
@@ -232,6 +238,8 @@ function AppInner({ signOut, user }) {
 
   // ── 長者 Modal ─────────────────────────────────────────────
   const [selectedRecipient, setSelectedRecipient] = useState(null)
+  useEffect(() => { if (selectedRecipient) loadHealthRecords(selectedRecipient.id) },
+    [selectedRecipient, loadHealthRecords])
 
   const sharedProps = { holidays, syncing, lastSync }
 
@@ -313,6 +321,7 @@ function AppInner({ signOut, user }) {
             healthRecords={healthRecords}
             setHealthRecords={setHealthRecords}
             addHealthRecord={addHealthRecord}
+            loadHealthRecords={loadHealthRecords}
             onSelectRecipient={setSelectedRecipient}
           />
         )}
@@ -327,6 +336,7 @@ function AppInner({ signOut, user }) {
           recipient={selectedRecipient}
           healthRecords={healthRecords[selectedRecipient.id] || []}
           attendance={attendance[selectedRecipient.id]}
+          monthlyAttendance={monthlyAttendance}
           onClose={() => setSelectedRecipient(null)}
         />
       )}

@@ -23,7 +23,7 @@ function MiniVital({ label, value }) {
   )
 }
 
-export default function RecipientModal({ recipient, healthRecords, attendance, onClose }) {
+export default function RecipientModal({ recipient, healthRecords, attendance, monthlyAttendance = {}, onClose }) {
   const { caregivers } = useData()
   const cg = caregivers.find(c => c.id === recipient.primaryCaregiver)
   const status = STATUS_TYPES[attendance] ?? null
@@ -144,7 +144,9 @@ export default function RecipientModal({ recipient, healthRecords, attendance, o
                   )
                 }
                 const isToday = i === 13
-                const stKey = isToday ? attendance : (Math.random() > 0.85 ? 'rest' : 'present')
+                // 讀實際點名紀錄（未設定視同出席），不再用亂數
+                const dk = `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
+                const stKey = isToday ? attendance : (monthlyAttendance[dk]?.[recipient.id] || 'present')
                 const st = STATUS_TYPES[stKey] ?? STATUS_TYPES.present
                 return (
                   <div key={i} className="flex flex-col items-center" style={{ width: 38 }}>
