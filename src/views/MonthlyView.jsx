@@ -326,6 +326,9 @@ export default function MonthlyView({
         </div>
         <p className="text-xs w-full" style={{ color: '#8B6F47' }}>
           點擊格子從選單選擇狀態 · 假日預設「假」，可手動調整為其他狀態 · 橫向滑動查看全月</p>
+        <p className="text-xs w-full px-3 py-2 rounded-lg" style={{ background: '#E2D5E8', color: '#5C2D6A' }}>
+          <span className="font-bold">備註｜喘息服務：</span>
+          讓長期照顧失能或失智長輩的家庭照顧者，在白天能夠暫時卸下照顧責任，獲得休息、就醫或處理個人事務的時間。</p>
         <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>
           <button onClick={markAllPresent}
             className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition hover:shadow-md"
