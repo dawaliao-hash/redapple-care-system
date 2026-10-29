@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useCallback } from 'react'
 import { ChevronLeft, ChevronRight, CalendarDays, X, AlertCircle } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
 import { STATUS_TYPES } from '../data/statusTypes.js'
+import StatusQuickPick from '../components/StatusQuickPick.jsx'
 import { TW_HOLIDAYS, formatDisplayDate } from '../data/monthlyAttendance.js'
 import KpiCard from '../components/KpiCard.jsx'
 import LegendDot from '../components/LegendDot.jsx'
@@ -178,7 +179,7 @@ export default function MatchingView({
 
   // ── 資料計算 ────────────────────────────────────────
   // 明確缺席的狀態：這些才從配對欄移除
-  const ABSENT_STATUSES = new Set(['rest','hospital','clinic','blood','absent','holiday','closed'])
+  const ABSENT_STATUSES = new Set(['rest','hospital','clinic','blood','absent','holiday','closed','rotate'])
 
   // 未設定出缺席 → 預設出席；只有明確標記缺席才不顯示
   const isOnSite = (status) => !status || !ABSENT_STATUSES.has(status)
@@ -513,24 +514,9 @@ export default function MatchingView({
                             style={{ color: '#5C2828' }}>{r.name}</button>
                         </td>
                         <td key={`s${col}`} className="px-3 py-2">
-                          <div className="flex gap-1">
-                            {Object.entries(STATUS_TYPES).map(([key, st]) => {
-                              const active = (attendance[r.id] ?? 'present') === key
-                              return (
-                                <button key={key}
-                                  onClick={() => setDayAttendance(r.id, key)}
-                                  title={st.label}
-                                  className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all hover:scale-110"
-                                  style={{
-                                    background: active ? st.dot : '#FBF6EC',
-                                    color:      active ? 'white' : st.text,
-                                    border:     `1.5px solid ${st.dot}`,
-                                  }}>
-                                  {st.short.length > 1 ? st.short[0] : st.short}
-                                </button>
-                              )
-                            })}
-                          </div>
+                          <StatusQuickPick size={6}
+                            current={attendance[r.id] ?? 'present'}
+                            onPick={key => setDayAttendance(r.id, key)} />
                         </td>
                       </>
                     ) : (

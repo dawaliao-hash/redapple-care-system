@@ -15,6 +15,8 @@ const ABSENT_SHORT = {
   blood:   { label: '抽', bg: '#EDD8DC', text: '#8B3A4A' },
   holiday: { label: '假', bg: '#F0EBF8', text: '#6A3D8E' },
   absent:  { label: '✕', bg: '#EAE5DA', text: '#6B5D4A' },
+  rotate:  { label: '輪', bg: '#DCE8E4', text: '#2F5D50' },
+  closed:  { label: '結', bg: '#3F3A36', text: '#FFFFFF' },
 }
 const ABSENT_SET = new Set(Object.keys(ABSENT_SHORT))
 

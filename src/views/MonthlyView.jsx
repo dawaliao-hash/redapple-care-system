@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, GripVertical, CheckCheck, RotateCcw } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
-import { STATUS_TYPES } from '../data/statusTypes.js'
+import { STATUS_TYPES, SELFPAY_KEYS } from '../data/statusTypes.js'
 import { formatDisplayDate } from '../data/monthlyAttendance.js'
 import { inCareDuringMonth, offerCloseCase } from '../utils/careWindow.js'
 
@@ -17,8 +17,11 @@ const SHORT = {
   respite:  { label: '喘', bg: '#E2D5E8', text: '#5C2D6A' },
   holiday:  { label: '假', bg: '#F0EBF8', text: '#6A3D8E' },
   absent:   { label: '✕', bg: '#EAE5DA', text: '#6B5D4A' },
-  selfpay:  { label: '自', bg: '#FFF1C2', text: '#7A5B00' },
+  rotate:   { label: '輪', bg: '#DCE8E4', text: '#2F5D50' },
   closed:   { label: '結', bg: '#3F3A36', text: '#FFFFFF' },
+  // 自費類：用兩字代碼（全/上/下 + 自/交/洗；交來=交通來回、交單=交通單趟）
+  ...Object.fromEntries(SELFPAY_KEYS.map(k =>
+    [k, { label: STATUS_TYPES[k].short, bg: STATUS_TYPES[k].bg, text: STATUS_TYPES[k].text }])),
 }
 
 // 狀態循環：假日日期從 holiday 開始，一般日從 present 開始
@@ -133,7 +136,7 @@ export default function MonthlyView({
   // ── 點格子 → 彈出下拉選單直接選狀態（取代舊的循環點擊）──────
   // cellMenu = { rid, dk, name, dateLabel, cur, left, top }
   const [cellMenu, setCellMenu] = useState(null)
-  const MENU_W = 200, MENU_H = 350
+  const MENU_W = 220, MENU_H = 480
 
   const openCellMenu = (e, r, d) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -332,6 +335,9 @@ export default function MonthlyView({
         <p className="text-xs w-full px-3 py-2 rounded-lg" style={{ background: '#E2D5E8', color: '#5C2D6A' }}>
           <span className="font-bold">備註｜喘息服務：</span>
           讓長期照顧失能或失智長輩的家庭照顧者，在白天能夠暫時卸下照顧責任，獲得休息、就醫或處理個人事務的時間。</p>
+        <p className="text-xs w-full px-3 py-2 rounded-lg" style={{ background: '#DCE8E4', color: '#2F5D50' }}>
+          <span className="font-bold">備註｜輪住：</span>
+          多人或多個家庭（通常是手足、子女）輪流接長輩到各自家中居住與照顧。</p>
         <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>
           <button onClick={markAllPresent}
             className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition hover:shadow-md"
@@ -520,6 +526,7 @@ export default function MonthlyView({
             left: cellMenu.left, top: cellMenu.top, width: MENU_W,
             background: '#FFFAF0', border: '2px solid #C4A87A', borderRadius: 12,
             boxShadow: '0 12px 32px rgba(92,40,40,0.25)', padding: 8,
+            maxHeight: MENU_H, overflowY: 'auto',
           }}>
             <div style={{ fontSize: 12, color: '#8B6F47', padding: '2px 6px 8px', fontWeight: 600 }}>
               {cellMenu.name} · {cellMenu.dateLabel}
@@ -528,6 +535,7 @@ export default function MonthlyView({
               {Object.entries(SHORT).map(([key, s]) => (
                 <button key={key} onClick={() => setCellStatus(key)}
                   style={{
+                    ...(STATUS_TYPES[key]?.selfpay ? { gridColumn: '1 / -1' } : {}),
                     display: 'flex', alignItems: 'center', gap: 6,
                     padding: '6px 8px', borderRadius: 8, fontSize: 12, fontWeight: 600,
                     background: s.bg, color: s.text, cursor: 'pointer',

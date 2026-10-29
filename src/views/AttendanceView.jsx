@@ -1,7 +1,8 @@
 import { useState, useMemo, useRef, useCallback } from 'react'
 import { Search, GripVertical, RotateCcw } from 'lucide-react'
 import { useData } from '../context/DataContext.jsx'
-import { STATUS_TYPES } from '../data/statusTypes.js'
+import { STATUS_TYPES, isSelfpay } from '../data/statusTypes.js'
+import StatusQuickPick from '../components/StatusQuickPick.jsx'
 import FilterChip from '../components/FilterChip.jsx'
 import { todayStr, weekDay } from '../utils/date.js'
 import { offerCloseCase } from '../utils/careWindow.js'
@@ -28,7 +29,8 @@ export default function AttendanceView({
   const filtered = useMemo(() => {
     return sortedRecipients.filter(r => {
       if (search && !r.name.includes(search) && !r.code.includes(search)) return false
-      if (filterStatus !== 'all' && (attendance[r.id] ?? 'present') !== filterStatus) return false
+      const st = attendance[r.id] ?? 'present'
+      if (filterStatus === 'selfpay_group' ? !isSelfpay(st) : (filterStatus !== 'all' && st !== filterStatus)) return false
       return true
     })
   }, [attendance, filterStatus, search, sortedRecipients])
@@ -36,7 +38,12 @@ export default function AttendanceView({
   const statusCounts = useMemo(() => {
     const c = { all: RECIPIENTS.length }
     Object.keys(STATUS_TYPES).forEach(k => { c[k] = 0 })
-    RECIPIENTS.forEach(r => { c[attendance[r.id] ?? 'present'] = (c[attendance[r.id] ?? 'present'] || 0) + 1 })
+    c.selfpay_group = 0
+    RECIPIENTS.forEach(r => {
+      const st = attendance[r.id] ?? 'present'
+      c[st] = (c[st] || 0) + 1
+      if (isSelfpay(st)) c.selfpay_group++
+    })
     return c
   }, [attendance, RECIPIENTS])
 
@@ -129,9 +136,10 @@ export default function AttendanceView({
 
         <div className="flex flex-wrap gap-2 mb-5 pb-5 border-b" style={{ borderColor: '#E5D5B7' }}>
           <FilterChip active={filterStatus === 'all'} onClick={() => setFilterStatus('all')} color="#5C2828" label="全部" count={statusCounts.all} />
-          {Object.entries(STATUS_TYPES).map(([key, s]) => (
+          {Object.entries(STATUS_TYPES).filter(([, s]) => !s.selfpay).map(([key, s]) => (
             <FilterChip key={key} active={filterStatus === key} onClick={() => setFilterStatus(key)} color={s.dot} label={s.label} count={statusCounts[key] || 0} />
           ))}
+          <FilterChip active={filterStatus === 'selfpay_group'} onClick={() => setFilterStatus('selfpay_group')} color={STATUS_TYPES.selfpay.dot} label="自費" count={statusCounts.selfpay_group || 0} />
         </div>
 
         <div className="overflow-hidden rounded-xl border" style={{ borderColor: '#E5D5B7' }}>
@@ -212,26 +220,12 @@ export default function AttendanceView({
                       </span>
                     </td>
                     <td className="px-3 py-3">
-                      <div className="flex justify-start gap-1 flex-wrap">
-                        {Object.entries(STATUS_TYPES).map(([key, st]) => (
-                          <button
-                            key={key}
-                            onClick={() => {
-                              setAttendance(prev => ({ ...prev, [r.id]: key }))
-                              if (key === 'closed') offerCloseCase(r, todayStr, updateRecipient)
-                            }}
-                            title={st.label}
-                            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all hover:scale-110"
-                            style={{
-                              background: (attendance[r.id] ?? 'present') === key ? st.dot : '#FBF6EC',
-                              color:      (attendance[r.id] ?? 'present') === key ? 'white' : st.text,
-                              border:     `1.5px solid ${st.dot}`,
-                            }}
-                          >
-                            {st.short.length > 1 ? st.short[0] : st.short}
-                          </button>
-                        ))}
-                      </div>
+                      <StatusQuickPick
+                        current={attendance[r.id] ?? 'present'}
+                        onPick={key => {
+                          setAttendance(prev => ({ ...prev, [r.id]: key }))
+                          if (key === 'closed') offerCloseCase(r, todayStr, updateRecipient)
+                        }} />
                     </td>
                   </tr>
                 )
