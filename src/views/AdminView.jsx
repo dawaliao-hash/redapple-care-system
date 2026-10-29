@@ -1029,7 +1029,7 @@ export default function AdminView() {
             </thead>
             <tbody>
               {filteredCG.map((cg, i) => {
-                const load = recipients.filter(r => r.primaryCaregiver === cg.id).length
+                const load = recipients.filter(r => r.primaryCaregiver === cg.id && r.isActive !== false).length
                 return (
                   <tr key={cg.id} className="border-t hover:bg-orange-50 transition"
                     style={{ borderColor: '#EAE0CC' }}>
@@ -1154,13 +1154,15 @@ export default function AdminView() {
         <CaregiverModal
           initial={editCaregiver.id ? editCaregiver : null}
           allCaregivers={caregivers}
-          allRecipients={recipients}
+          // 已結案長者不出現在負責名單、不佔名額；但不清除其 primaryCaregiver，
+          // 以保留結案前月份（月度人力）的歷史配對
+          allRecipients={recipients.filter(r => r.isActive !== false)}
           onSave={async (c, selectedRecipientIds) => {
             // 1. 儲存照服員基本資料
             await (editCaregiver.id ? updateCaregiver(c) : addCaregiver(c))
             // 2. 更新長者的 primaryCaregiver 欄位
             const cgId = c.id
-            for (const r of recipients) {
+            for (const r of recipients.filter(x => x.isActive !== false)) {
               const wasAssigned = r.primaryCaregiver === cgId
               const isSelected  = selectedRecipientIds.includes(r.id)
               if (wasAssigned && !isSelected) {
