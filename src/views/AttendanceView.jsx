@@ -4,13 +4,14 @@ import { useData } from '../context/DataContext.jsx'
 import { STATUS_TYPES } from '../data/statusTypes.js'
 import FilterChip from '../components/FilterChip.jsx'
 import { todayStr, weekDay } from '../utils/date.js'
+import { offerCloseCase } from '../utils/careWindow.js'
 
 export default function AttendanceView({
   attendance, setAttendance,
   recipientOrder, setRecipientOrder,   // 由 App.jsx 傳入，與月度點名、配對總覽共用
   onSelectRecipient, holidays = {},
 }) {
-  const { activeRecipients: RECIPIENTS, activeCaregivers: CAREGIVERS } = useData()
+  const { activeRecipients: RECIPIENTS, activeCaregivers: CAREGIVERS, updateRecipient } = useData()
   const [filterStatus, setFilterStatus] = useState('all')
   const [search, setSearch]             = useState('')
 
@@ -215,7 +216,10 @@ export default function AttendanceView({
                         {Object.entries(STATUS_TYPES).map(([key, st]) => (
                           <button
                             key={key}
-                            onClick={() => setAttendance(prev => ({ ...prev, [r.id]: key }))}
+                            onClick={() => {
+                              setAttendance(prev => ({ ...prev, [r.id]: key }))
+                              if (key === 'closed') offerCloseCase(r, todayStr, updateRecipient)
+                            }}
                             title={st.label}
                             className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all hover:scale-110"
                             style={{

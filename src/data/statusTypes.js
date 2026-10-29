@@ -7,11 +7,13 @@ export const STATUS_TYPES = {
   clinic:   { label: '回診',   short: '診', bg: '#D8E2EA', text: '#2D4F6A', dot: '#5B7B8C', days: 1.0 },
   blood:    { label: '抽血',   short: '抽', bg: '#EDD8DC', text: '#8B3A4A', dot: '#B8546A', days: 1.0 },
   respite:  { label: '喘息',   short: '喘', bg: '#E2D5E8', text: '#5C2D6A', dot: '#8E6BA8', days: 1.0 },
+  selfpay:  { label: '自費',   short: '自', bg: '#FFF1C2', text: '#7A5B00', dot: '#D4A017', days: 1.0 },
   holiday:  { label: '國定假', short: '假', bg: '#F0EBF8', text: '#6A3D8E', dot: '#9B6CC8', days: 0 },
   absent:   { label: '未到',   short: '✕', bg: '#EAE5DA', text: '#6B5D4A', dot: '#A09684', days: 0 },
+  closed:   { label: '結案',   short: '結', bg: '#3F3A36', text: '#FFFFFF', dot: '#3F3A36', days: 0 },
 }
 
 // 視為「出席（有服務）」的狀態集合
-export const PRESENT_STATUSES = new Set(['present','am','pm','clinic','hospital','blood','respite'])
+export const PRESENT_STATUSES = new Set(['present','am','pm','clinic','hospital','blood','respite','selfpay'])
 // 視為「缺席」的狀態集合
-export const ABSENT_STATUSES  = new Set(['absent','rest','holiday'])
+export const ABSENT_STATUSES  = new Set(['absent','rest','holiday','closed'])

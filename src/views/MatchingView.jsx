@@ -178,7 +178,7 @@ export default function MatchingView({
 
   // ── 資料計算 ────────────────────────────────────────
   // 明確缺席的狀態：這些才從配對欄移除
-  const ABSENT_STATUSES = new Set(['rest','hospital','clinic','blood','absent','holiday'])
+  const ABSENT_STATUSES = new Set(['rest','hospital','clinic','blood','absent','holiday','closed'])
 
   // 未設定出缺席 → 預設出席；只有明確標記缺席才不顯示
   const isOnSite = (status) => !status || !ABSENT_STATUSES.has(status)

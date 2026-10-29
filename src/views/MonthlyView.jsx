@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, GripVertical, CheckCheck, RotateCcw } from '
 import { useData } from '../context/DataContext.jsx'
 import { STATUS_TYPES } from '../data/statusTypes.js'
 import { formatDisplayDate } from '../data/monthlyAttendance.js'
-import { inCareDuringMonth } from '../utils/careWindow.js'
+import { inCareDuringMonth, offerCloseCase } from '../utils/careWindow.js'
 
 // 月度表用的短符號（含假日）
 const SHORT = {
@@ -17,6 +17,8 @@ const SHORT = {
   respite:  { label: '喘', bg: '#E2D5E8', text: '#5C2D6A' },
   holiday:  { label: '假', bg: '#F0EBF8', text: '#6A3D8E' },
   absent:   { label: '✕', bg: '#EAE5DA', text: '#6B5D4A' },
+  selfpay:  { label: '自', bg: '#FFF1C2', text: '#7A5B00' },
+  closed:   { label: '結', bg: '#3F3A36', text: '#FFFFFF' },
 }
 
 // 狀態循環：假日日期從 holiday 開始，一般日從 present 開始
@@ -43,7 +45,7 @@ export default function MonthlyView({
   holidays = {},
   ensureMonthLoaded,
 }) {
-  const { recipients: ALL_RECIPIENTS } = useData()
+  const { recipients: ALL_RECIPIENTS, updateRecipient } = useData()
   const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d }, [])
 
   const [viewYear, setViewYear]   = useState(today.getFullYear())
@@ -131,7 +133,7 @@ export default function MonthlyView({
   // ── 點格子 → 彈出下拉選單直接選狀態（取代舊的循環點擊）──────
   // cellMenu = { rid, dk, name, dateLabel, cur, left, top }
   const [cellMenu, setCellMenu] = useState(null)
-  const MENU_W = 200, MENU_H = 316
+  const MENU_W = 200, MENU_H = 350
 
   const openCellMenu = (e, r, d) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -157,6 +159,7 @@ export default function MonthlyView({
       [dk]: { ...(prev[dk] ?? {}), [rid]: statusKey },
     }))
     setCellMenu(null)
+    if (statusKey === 'closed') offerCloseCase(ALL_RECIPIENTS.find(r => r.id === rid), dk, updateRecipient)
   }
 
   // 計算某長者某日的出席天數（1.0=全天, 0.5=半天, 0=缺席）
