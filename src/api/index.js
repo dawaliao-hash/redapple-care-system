@@ -363,6 +363,14 @@ export async function setUserApprovalStatus(userId, status) {
   if (error) throw error
 }
 
+// 管理員：列出所有帳號與屬性（需先執行 016_admin_list_accounts.sql）
+export async function fetchAllAccounts() {
+  if (!isOnline) return []
+  const { data, error } = await supabase.rpc('admin_list_accounts')
+  if (error) throw error
+  return data ?? []
+}
+
 // 取得特定月份的健康紀錄
 export async function fetchHealthRecordsForMonth(recipientId, year, month) {
   if (!isOnline) return []

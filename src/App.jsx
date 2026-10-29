@@ -31,7 +31,10 @@ import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
 const today    = new Date()
 const todayStr = formatDisplayDate(today)
 
-function AppInner({ signOut, user }) {
+// 護理師帳號（role='nurse'）：只能看到「健康紀錄」與「帳號設定」（手機使用情境）
+const HEALTH_ONLY_TABS = ['health', 'account']
+
+function AppInner({ signOut, user, healthOnly = false }) {
   const { recipients, loading: dataLoading } = useData()
   const { holidays, syncing, lastSync }      = useHolidaySync()
 
@@ -47,7 +50,7 @@ function AppInner({ signOut, user }) {
     () => recipients.map(r => r.id)
   )
 
-  const [tab, setTab] = useState('matching')
+  const [tab, setTab] = useState(healthOnly ? 'health' : 'matching')
 
   // ── 月度出缺席（localStorage 快取 + Supabase 同步）──────────
   // v2：版本號更新讓舊的假資料快取自動失效
@@ -263,8 +266,8 @@ function AppInner({ signOut, user }) {
   return (
     <div className="min-h-screen" style={{ background: '#FBF6EC', color: '#3D2817' }}>
       <Header syncing={syncing} lastSync={lastSync} isOnline={isOnline} user={user} signOut={signOut} onSync={refetchFromSupabase} />
-      <TabNav tab={tab} setTab={setTab} />
-      <main className="max-w-7xl mx-auto px-6 py-6">
+      <TabNav tab={tab} setTab={setTab} allowedTabs={healthOnly ? HEALTH_ONLY_TABS : undefined} />
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
         {tab === 'matching' && (
           <MatchingView
             monthlyAttendance={monthlyAttendance}
@@ -350,7 +353,7 @@ function AuthGate() {
     window.location.hash.includes('type=recovery') ||
     new URLSearchParams(window.location.search).get('type') === 'recovery'
   )
-  // null = 尚未檢查, 'admin'|'approved'|'pending'|'rejected'
+  // null = 尚未檢查, 'admin'|'nurse'|'approved'|'pending'|'rejected'
   const [approvalStatus, setApprovalStatus] = useState(null)
 
   useEffect(() => {
@@ -363,10 +366,15 @@ function AuthGate() {
   // 登入後檢查帳號審核狀態
   // SQL 執行前的 email 備援清單：這些帳號一律視為管理員
   const ADMIN_EMAILS = ['amuy.chen@gmail.com', 'dawadorge@gmail.com', 'nina0626790@gmail.com']
+  // 護理師帳號（role='nurse' 或在此名單）：免審核，但只能使用健康紀錄
+  const NURSE_EMAILS = ['yiseadata@gmail.com', 'ytc0626790@gmail.com']
   useEffect(() => {
     if (!user) { setApprovalStatus(null); return }
     if (user.user_metadata?.role === 'admin' || ADMIN_EMAILS.includes(user.email)) {
       setApprovalStatus('admin'); return
+    }
+    if (user.user_metadata?.role === 'nurse' || NURSE_EMAILS.includes(user.email)) {
+      setApprovalStatus('nurse'); return
     }
     checkApprovalStatus(user.id).then(setApprovalStatus)
   }, [user])
@@ -403,7 +411,7 @@ function AuthGate() {
 
   return (
     <DataProvider>
-      <AppInner signOut={signOut} user={user} />
+      <AppInner signOut={signOut} user={user} healthOnly={approvalStatus === 'nurse'} />
     </DataProvider>
   )
 }

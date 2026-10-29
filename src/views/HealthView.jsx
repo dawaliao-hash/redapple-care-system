@@ -101,13 +101,13 @@ function MeasureModal({ initial, recipientName, caregivers, onSave, onClose }) {
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="p-4 sm:p-6 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs mb-1.5 font-medium" style={{ color: '#8B6F47' }}>日期</label>
               <input type="date" className={inputCls} style={inputSt}
                 value={form.fullDate.replace(/\//g, '-')}
-                onChange={e => set('fullDate', e.target.value)} />
+                onChange={e => set('fullDate', e.target.value.replace(/-/g, '/'))} />
             </div>
             <div>
               <label className="block text-xs mb-1.5 font-medium" style={{ color: '#8B6F47' }}>時間</label>
@@ -130,6 +130,7 @@ function MeasureModal({ initial, recipientName, caregivers, onSave, onClose }) {
                     {f.icon} {f.label}
                   </label>
                   <input type="number" step={f.step ?? '1'} min={f.min} max={f.max}
+                    inputMode={f.step ? 'decimal' : 'numeric'}
                     className={inputCls}
                     style={{ ...inputSt, borderColor: errors[f.key] ? '#A53838' : '#C4A87A' }}
                     placeholder={f.ph} value={form[f.key]}

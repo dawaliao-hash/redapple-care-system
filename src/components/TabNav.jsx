@@ -12,12 +12,12 @@ const TABS = [
   { id: 'account',    label: '帳號設定', icon: UserCog },
 ]
 
-export default function TabNav({ tab, setTab }) {
+export default function TabNav({ tab, setTab, allowedTabs }) {
   return (
     <nav className="border-b" style={{ background: '#FFFAF0', borderColor: '#E5D5B7' }}>
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex gap-1 overflow-x-auto scrollbar-thin">
-          {TABS.map(t => {
+          {TABS.filter(t => !allowedTabs || allowedTabs.includes(t.id)).map(t => {
             const Icon   = t.icon
             const active = tab === t.id
             return (

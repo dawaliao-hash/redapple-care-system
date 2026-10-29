@@ -11,7 +11,7 @@ export default function Header({ syncing, lastSync, isOnline, user, signOut, onS
 
   return (
     <header className="border-b-2" style={{ background: 'linear-gradient(135deg, #FFFAF0 0%, #FBF1DD 100%)', borderColor: '#C4A87A' }}>
-      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between flex-wrap gap-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between flex-wrap gap-4">
 
         {/* 左：Logo + 機構名稱 */}
         <div className="flex items-center gap-4">

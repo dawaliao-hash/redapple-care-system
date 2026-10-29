@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Eye, EyeOff, KeyRound, Mail, User, Shield, Send, CheckCircle2, XCircle, Clock, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
-import { fetchPendingUsers, setUserApprovalStatus } from '../api/index.js'
+import { fetchPendingUsers, setUserApprovalStatus, fetchAllAccounts } from '../api/index.js'
 
 // ── 修改自己的密碼 ─────────────────────────────────────────
 function ChangePasswordSection({ user }) {
@@ -265,12 +265,82 @@ ON CONFLICT (id) DO NOTHING;`}
   )
 }
 
+// ── 所有帳號與屬性（管理員）────────────────────────────────
+const ROLE_LABEL = {
+  admin: { text: '管理員', bg: '#A53838', color: 'white' },
+  nurse: { text: '護理師', bg: '#5B7B8C', color: 'white' },
+}
+const STATUS_LABEL = { approved: '已核准', pending: '待審核', rejected: '已拒絕' }
+const fmtTime = (t) => t ? new Date(t).toLocaleString('zh-TW', { hour12: false }).slice(0, -3) : '從未登入'
+
+function AllAccountsSection() {
+  const [rows, setRows]       = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState('')
+
+  const load = () => {
+    setLoading(true); setError('')
+    fetchAllAccounts()
+      .then(d => setRows(d))
+      .catch(e => setError(e?.message || '讀取失敗'))
+      .finally(() => setLoading(false))
+  }
+  useEffect(() => { load() }, [])
+
+  return (
+    <div className="rounded-2xl p-5 border" style={{ background: '#FFFAF0', borderColor: '#E5D5B7' }}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <User size={18} style={{ color: '#A53838' }}/>
+          <h3 className="font-display font-semibold" style={{ color: '#5C2828' }}>所有帳號與屬性</h3>
+          {!loading && !error && <span className="text-xs" style={{ color: '#8B6F47' }}>共 {rows.length} 個</span>}
+        </div>
+        <button onClick={load} className="p-1.5 rounded-lg hover:bg-orange-50" title="重新整理">
+          <RefreshCw size={14} style={{ color: '#8B6F47' }}/>
+        </button>
+      </div>
+      {loading ? (
+        <p className="text-sm text-center py-4" style={{ color: '#A09684' }}>載入中⋯</p>
+      ) : error ? (
+        <p className="text-sm p-3 rounded-lg" style={{ background: '#FBE8DC', color: '#A53838' }}>
+          無法讀取帳號清單：{error}<br/>
+          <span className="text-xs">若是第一次使用，請先在 Supabase SQL Editor 執行 supabase/016_admin_list_accounts.sql</span>
+        </p>
+      ) : (
+        <div className="divide-y" style={{ borderColor: '#EAE0CC' }}>
+          {rows.map(r => {
+            const role = ROLE_LABEL[r.role] ?? { text: '一般人員', bg: '#EAE0CC', color: '#5C3A1E' }
+            return (
+              <div key={r.id} className="py-2.5 flex items-center gap-3 flex-wrap">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate" style={{ color: '#5C2828' }}>{r.email}</div>
+                  <div className="text-xs" style={{ color: '#A09684' }}>
+                    最後登入：{fmtTime(r.last_sign_in_at)}
+                  </div>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                  style={{ background: role.bg, color: role.color }}>{role.text}</span>
+                {r.approval_status !== 'approved' && (
+                  <span className="text-xs" style={{ color: '#C68B4F' }}>
+                    {STATUS_LABEL[r.approval_status] ?? r.approval_status}
+                  </span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── 主 AccountView ─────────────────────────────────────────
 export default function AccountView({ user }) {
   const userDisplay = user?.user_metadata?.display_name || user?.email?.split('@')[0] || '使用者'
   // 管理員判斷：已設定 role='admin' 的帳號，或在 SQL 執行前以 email 暫時辨識
   const ADMIN_EMAILS = ['amuy.chen@gmail.com', 'dawadorge@gmail.com', 'nina0626790@gmail.com']
   const isAdmin = user?.user_metadata?.role === 'admin' || ADMIN_EMAILS.includes(user?.email)
+  const isNurse = !isAdmin && user?.user_metadata?.role === 'nurse'
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
@@ -300,6 +370,10 @@ export default function AccountView({ user }) {
               <Shield size={12}/> 管理員
             </span>
           )}
+          {isNurse && (
+            <span className="px-2.5 py-1 rounded-full text-xs font-medium"
+              style={{ background: '#5B7B8C', color: 'white' }}>護理師</span>
+          )}
         </div>
       </div>
 
@@ -312,17 +386,18 @@ export default function AccountView({ user }) {
         <ChangePasswordSection user={user}/>
       </div>
 
-      {/* 寄送密碼重設信 */}
-      <div className="rounded-2xl p-5 border" style={{ background: '#FFFAF0', borderColor: '#E5D5B7' }}>
+      {/* 寄送密碼重設信（護理師帳號不顯示） */}
+      {!isNurse && <div className="rounded-2xl p-5 border" style={{ background: '#FFFAF0', borderColor: '#E5D5B7' }}>
         <div className="flex items-center gap-2 mb-4">
           <Mail size={18} style={{ color: '#A53838' }}/>
           <h3 className="font-display font-semibold" style={{ color: '#5C2828' }}>寄送密碼重設信</h3>
         </div>
         <SendResetSection/>
-      </div>
+      </div>}
 
       {/* 帳號審核（管理員才看得到） */}
       {isAdmin && <ApprovalSection />}
+      {isAdmin && <AllAccountsSection />}
     </div>
   )
 }
